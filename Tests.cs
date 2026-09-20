@@ -34,10 +34,14 @@ namespace YtDlpGuiMvp
             }
             using (var form = new MainForm(false))
             {
+                Check(Program.IsWindows7OrOlder(PlatformID.Win32NT, new Version(6, 1)), "Windows 7 应收到兼容性提示");
+                Check(!Program.IsWindows7OrOlder(PlatformID.Win32NT, new Version(6, 2)), "Windows 8 不应误判为 Windows 7");
+                Check(!Program.IsWindows7OrOlder(PlatformID.Win32NT, new Version(10, 0)), "Windows 10 不应误判为 Windows 7");
                 var type = typeof(MainForm);
                 var build = type.GetMethod("BuildArguments", BindingFlags.NonPublic | BindingFlags.Instance);
                 var selectMode = type.GetMethod("SelectMode", BindingFlags.NonPublic | BindingFlags.Instance);
                 var subtitleLanguage = (ComboBox)type.GetField("subtitleLanguageBox", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(form);
+                var videoResolution = (ComboBox)type.GetField("videoResolutionBox", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(form);
                 var modeButtons = (Button[])type.GetField("modeButtons", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(form);
                 var firefox = (CheckBox)type.GetField("firefoxBox", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(form);
                 var playlist = (CheckBox)type.GetField("playlistBox", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(form);
@@ -48,32 +52,57 @@ namespace YtDlpGuiMvp
                 string video = (string)build.Invoke(form, new object[] { url, folder, appDir });
                 Check(video.Contains("--no-playlist") && video.Contains("-t mp4") && video.Contains("\"https://example.com/video?a=1&b=2\""), "视频参数");
                 Check(video.Contains("--no-overwrites") && video.Contains("--no-post-overwrites") && video.Contains("--ignore-config"), "保护已有文件参数");
+                Check(!video.Contains("-S \"res:"), "自动画质保持原有参数");
                 Check(video.Contains("\"C:\\视频 下载\\\\\""), "路径末尾反斜杠转义");
+
+                int[] expectedHeights = { 360, 480, 720, 1080, 1440, 2160 };
+                Check(videoResolution.Items.Count == 7 && videoResolution.Enabled, "视频分辨率选项可见且可选");
+                for (int i = 0; i < expectedHeights.Length; i++)
+                {
+                    videoResolution.SelectedIndex = i + 1;
+                    string height = expectedHeights[i].ToString();
+                    string limited = (string)build.Invoke(form, new object[] { url, folder, appDir });
+                    Check(limited.Contains("-S \"res:" + height + "\""), "优先 " + height + "p 画质排序");
+                    Check(limited.Contains("%(resolution)s"), "不同实际分辨率不会共用文件名");
+                    Check(limited.Contains("-t mp4"), "画质选择保持 MP4 输出");
+                }
 
                 Check(modeButtons.Length == 3 && modeButtons[0].BackColor != modeButtons[1].BackColor, "下载类型按钮选中状态");
                 Check(modeButtons[0].Text == "视频 MP4" && modeButtons[1].Text == "音频 MP3" && modeButtons[2].Text == "字幕 SRT", "三个按钮必须有明确文字");
                 Check(modeButtons[0].Parent is FlowLayoutPanel && modeButtons[0].TextAlign == System.Drawing.ContentAlignment.MiddleCenter && modeButtons[0].Width >= 100, "按钮布局及文字绘制参数");
                 selectMode.Invoke(form, new object[] { 1 });
+                Check(!videoResolution.Enabled, "音频模式禁用分辨率");
                 firefox.Checked = true;
                 playlist.Checked = true;
                 string audio = (string)build.Invoke(form, new object[] { url, folder, appDir });
                 Check(audio.Contains("--yes-playlist") && audio.Contains("--cookies-from-browser firefox") && audio.Contains("-t mp3"), "音频、Firefox 和列表参数");
+                Check(!audio.Contains("-S \"res:"), "音频模式不带视频画质参数");
 
                 selectMode.Invoke(form, new object[] { 2 });
+                Check(!videoResolution.Enabled, "字幕模式禁用分辨率");
                 string subtitles = (string)build.Invoke(form, new object[] { url, folder, appDir });
                 Check(subtitles.Contains("--skip-download") && subtitles.Contains("--sub-langs \"^zh-Hans$\"") && subtitles.Contains("--convert-subs srt"), "单一简体字幕参数");
+                Check(!subtitles.Contains("-S \"res:"), "字幕模式不带视频画质参数");
                 Check(!subtitles.Contains("zh.*,en.*"), "不能批量请求翻译字幕");
                 subtitleLanguage.SelectedIndex = 1;
                 Check(((string)build.Invoke(form, new object[] { url, folder, appDir })).Contains("--sub-langs \"^zh-Hant$\""), "单一繁体字幕参数");
                 subtitleLanguage.SelectedIndex = 2;
                 Check(((string)build.Invoke(form, new object[] { url, folder, appDir })).Contains("--sub-langs \"^en$\""), "单一英文字幕参数");
 
-                var extract = type.GetMethod("ExtractFirstUrl", BindingFlags.NonPublic | BindingFlags.Static);
+                var extract = type.GetMethod("ExtractPreferredUrl", BindingFlags.NonPublic | BindingFlags.Static);
                 string share = "7.61 Q@K.JV kcN:/ 06/28 :2pm 今天粤菜厨师揭秘杨枝甘露！ https://v.douyin.com/59nAEfuhXCY/ 复制此链接，打开抖音观看视频！";
                 Check((string)extract.Invoke(null, new object[] { share }) == "https://v.douyin.com/59nAEfuhXCY/", "分享文案提取网址");
                 Check((string)extract.Invoke(null, new object[] { "[https://v.douyin.com/test/](https://v.douyin.com/test/)" }) == "https://v.douyin.com/test/", "Markdown 链接提取");
                 Check((string)extract.Invoke(null, new object[] { "网址 https://youtu.be/test?x=1&y=2。" }) == "https://youtu.be/test?x=1&y=2", "网址末尾标点与查询参数");
+                Check((string)extract.Invoke(null, new object[] { "旧网址 https://youtu.be/old 新网址 https://youtu.be/new" }) == "https://youtu.be/new", "换视频时优先使用最后粘贴的新网址");
                 Check(extract.Invoke(null, new object[] { "没有网址" }) == null, "无网址识别");
+
+                var linkInput = (ReplaceOnPasteTextBox)type.GetField("urlBox", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(form);
+                linkInput.Text = "旧网址 https://youtu.be/old";
+                linkInput.SelectionStart = linkInput.TextLength;
+                linkInput.SelectionLength = 0;
+                linkInput.SelectExistingTextForPaste();
+                Check(linkInput.SelectionStart == 0 && linkInput.SelectionLength == linkInput.TextLength, "粘贴前自动选中并替换旧内容");
 
                 var subfolder = type.GetMethod("ModeSubfolder", BindingFlags.NonPublic | BindingFlags.Static);
                 Check((string)subfolder.Invoke(null, new object[] { 0 }) == "mp4", "视频目录");
@@ -154,7 +183,7 @@ namespace YtDlpGuiMvp
                 using (var image = new Bitmap(form.Width, form.Height))
                 {
                     form.DrawToBitmap(image, new Rectangle(0, 0, image.Width, image.Height));
-                    image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ui-preview-v0.5.png"));
+                    image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ui-preview-v0.6.1.png"));
                 }
                 form.Close();
             }

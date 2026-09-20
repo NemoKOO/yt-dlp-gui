@@ -18,15 +18,45 @@ namespace YtDlpGuiMvp
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            Version windows = Environment.OSVersion.Version;
+            if (IsWindows7OrOlder(Environment.OSVersion.Platform, windows))
+            {
+                MessageBox.Show("此公开版使用的 yt-dlp 官方程序已不支持 Windows 7，因此无法通过安装或复制 python310.dll 修复。\n\n请在 Windows 10/11 x64 上使用。若必须继续使用 Windows 7，需要另行维护和测试专用的旧版组件组合；本程序不会在 Win7 上自动下载不兼容的组件。",
+                    "Windows 7 不受支持", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             Application.Run(new MainForm());
+        }
+
+        internal static bool IsWindows7OrOlder(PlatformID platform, Version windows)
+        {
+            return platform == PlatformID.Win32NT &&
+                   (windows.Major < 6 || (windows.Major == 6 && windows.Minor < 2));
+        }
+    }
+
+    internal sealed class ReplaceOnPasteTextBox : TextBox
+    {
+        private const int WmPaste = 0x0302;
+
+        internal void SelectExistingTextForPaste()
+        {
+            if (TextLength > 0) SelectAll();
+        }
+
+        protected override void WndProc(ref Message message)
+        {
+            if (message.Msg == WmPaste) SelectExistingTextForPaste();
+            base.WndProc(ref message);
         }
     }
 
     internal sealed class MainForm : Form
     {
-        private readonly TextBox urlBox = new TextBox();
+        private readonly ReplaceOnPasteTextBox urlBox = new ReplaceOnPasteTextBox();
         private readonly Button[] modeButtons = { new Button(), new Button(), new Button() };
         private readonly ComboBox subtitleLanguageBox = new ComboBox();
+        private readonly ComboBox videoResolutionBox = new ComboBox();
         private int selectedMode;
         private readonly TextBox folderBox = new TextBox();
         private readonly CheckBox firefoxBox = new CheckBox();
@@ -62,7 +92,7 @@ namespace YtDlpGuiMvp
         public MainForm(bool checkComponentsOnShown = true)
         {
             ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
-            Text = "视频音频字幕下载 · MVP v0.5";
+            Text = "视频音频字幕下载 · MVP v0.6.1";
             Icon = SystemIcons.Application;
             MinimumSize = new Size(760, 700);
             Size = new Size(960, 760);
@@ -81,13 +111,14 @@ namespace YtDlpGuiMvp
             root.Padding = new Padding(28, 20, 28, 20);
             root.BackColor = Color.White;
             root.ColumnCount = 1;
-            root.RowCount = 15;
+            root.RowCount = 16;
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 55));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 27));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 27));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 82));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 29));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 43));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 27));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 43));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 29));
@@ -109,7 +140,7 @@ namespace YtDlpGuiMvp
             var subtitle = MakeLabel("复制分享文案或视频网址，选择格式，然后点击开始下载。");
             subtitle.ForeColor = Color.FromArgb(101, 116, 139);
             root.Controls.Add(subtitle, 0, 1);
-            root.Controls.Add(MakeLabel("分享文字或视频网址"), 0, 2);
+            root.Controls.Add(MakeLabel("分享文字或视频网址（粘贴新内容会自动替换旧内容）"), 0, 2);
             urlBox.Dock = DockStyle.Fill;
             urlBox.Multiline = true;
             urlBox.ScrollBars = ScrollBars.Vertical;
@@ -163,9 +194,34 @@ namespace YtDlpGuiMvp
             subtitleLanguageBox.FlatStyle = FlatStyle.Standard;
             optionRow.Controls.Add(subtitleLanguageBox);
             root.Controls.Add(optionRow, 0, 5);
+
+            var resolutionRow = new FlowLayoutPanel();
+            resolutionRow.Dock = DockStyle.Fill;
+            resolutionRow.WrapContents = false;
+            var resolutionLabel = MakeLabel("视频目标分辨率");
+            resolutionLabel.Dock = DockStyle.None;
+            resolutionLabel.Size = new Size(143, 38);
+            resolutionRow.Controls.Add(resolutionLabel);
+            videoResolutionBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            videoResolutionBox.Items.AddRange(new object[] {
+                "自动（原有选择）", "优先 360p", "优先 480p", "优先 720p",
+                "优先 1080p", "优先 1440p（2K）", "优先 2160p（4K）"
+            });
+            videoResolutionBox.SelectedIndex = 0;
+            videoResolutionBox.Width = 190;
+            videoResolutionBox.Margin = new Padding(0, 5, 12, 0);
+            videoResolutionBox.FlatStyle = FlatStyle.Standard;
+            resolutionRow.Controls.Add(videoResolutionBox);
+            var resolutionHint = MakeLabel("按片源实际画质选择，不会放大画面");
+            resolutionHint.Dock = DockStyle.None;
+            resolutionHint.Size = new Size(310, 38);
+            resolutionHint.ForeColor = Color.FromArgb(101, 116, 139);
+            resolutionRow.Controls.Add(resolutionHint);
+            root.Controls.Add(resolutionRow, 0, 6);
+            tips.SetToolTip(videoResolutionBox, "优先选不高于目标的最佳画质；如果片源只提供更高画质，会选它提供的最低画质。竖屏视频也按较短边判断。");
             SelectMode(0);
 
-            root.Controls.Add(MakeLabel("保存根目录（自动按类型分类）"), 0, 6);
+            root.Controls.Add(MakeLabel("保存根目录（自动按类型分类）"), 0, 7);
 
             var folderRow = new TableLayoutPanel();
             folderRow.Dock = DockStyle.Fill;
@@ -183,12 +239,12 @@ namespace YtDlpGuiMvp
             StyleButton(browseButton, Color.FromArgb(231, 237, 245), Color.FromArgb(36, 53, 77));
             browseButton.Click += BrowseClicked;
             folderRow.Controls.Add(browseButton, 1, 0);
-            root.Controls.Add(folderRow, 0, 7);
+            root.Controls.Add(folderRow, 0, 8);
             savePreview.Dock = DockStyle.Fill;
             savePreview.TextAlign = ContentAlignment.MiddleLeft;
             savePreview.ForeColor = Color.FromArgb(88, 101, 119);
             savePreview.AutoEllipsis = true;
-            root.Controls.Add(savePreview, 0, 8);
+            root.Controls.Add(savePreview, 0, 9);
 
             var checkRow = new FlowLayoutPanel();
             checkRow.Dock = DockStyle.Fill;
@@ -201,7 +257,7 @@ namespace YtDlpGuiMvp
             playlistBox.Margin = new Padding(0, 10, 0, 0);
             checkRow.Controls.Add(firefoxBox);
             checkRow.Controls.Add(playlistBox);
-            root.Controls.Add(checkRow, 0, 9);
+            root.Controls.Add(checkRow, 0, 10);
             tips.SetToolTip(firefoxBox, "先用 Firefox 打开目标视频站点并刷新页面，再勾选。Cookies 可能包含登录状态。");
 
             var buttonRow = new FlowLayoutPanel();
@@ -228,18 +284,18 @@ namespace YtDlpGuiMvp
             StyleButton(updateButton, Color.FromArgb(221, 241, 238), Color.FromArgb(17, 105, 98));
             updateButton.Click += UpdateClicked;
             tips.SetToolTip(updateButton, "检查四个运行组件；缺少时从官方 GitHub 下载并校验，完整时可更新 yt-dlp。");
-            root.Controls.Add(buttonRow, 0, 10);
+            root.Controls.Add(buttonRow, 0, 11);
 
             progress.Dock = DockStyle.Fill;
             progress.Minimum = 0;
             progress.Maximum = 100;
-            root.Controls.Add(progress, 0, 11);
+            root.Controls.Add(progress, 0, 12);
             status.Text = "就绪";
             status.Dock = DockStyle.Fill;
             status.ForeColor = Color.FromArgb(70, 82, 96);
             status.AutoEllipsis = true;
-            root.Controls.Add(status, 0, 12);
-            root.Controls.Add(MakeLabel("运行记录（不显示 Cookies 内容）"), 0, 13);
+            root.Controls.Add(status, 0, 13);
+            root.Controls.Add(MakeLabel("运行记录（不显示 Cookies 内容）"), 0, 14);
             logBox.Multiline = true;
             logBox.ScrollBars = ScrollBars.Vertical;
             logBox.ReadOnly = true;
@@ -247,7 +303,7 @@ namespace YtDlpGuiMvp
             logBox.BorderStyle = BorderStyle.FixedSingle;
             logBox.BackColor = Color.FromArgb(250, 252, 255);
             logBox.Font = new Font("Consolas", 9F);
-            root.Controls.Add(logBox, 0, 14);
+            root.Controls.Add(logBox, 0, 15);
             UpdateUrlPreview();
             UpdateSavePreview();
         }
@@ -273,11 +329,12 @@ namespace YtDlpGuiMvp
             return label;
         }
 
-        private static string ExtractFirstUrl(string input)
+        private static string ExtractPreferredUrl(string input)
         {
             if (String.IsNullOrWhiteSpace(input)) return null;
-            Match match = urlPattern.Match(input);
-            if (!match.Success) return null;
+            MatchCollection matches = urlPattern.Matches(input);
+            if (matches.Count == 0) return null;
+            Match match = matches[matches.Count - 1];
             return match.Value.TrimEnd('.', ',', ';', '!', '。', '，', '；', '！', '？', '、');
         }
 
@@ -299,6 +356,7 @@ namespace YtDlpGuiMvp
                 modeButtons[i].FlatAppearance.BorderColor = selected ? Color.FromArgb(21, 82, 173) : Color.FromArgb(195, 208, 225);
             }
             subtitleLanguageBox.Enabled = mode == 2 && downloadButton.Enabled;
+            videoResolutionBox.Enabled = mode == 0 && downloadButton.Enabled;
             UpdateSavePreview();
         }
 
@@ -309,9 +367,23 @@ namespace YtDlpGuiMvp
             return "^zh-Hans$";
         }
 
+        private int SelectedPreferredResolution()
+        {
+            switch (videoResolutionBox.SelectedIndex)
+            {
+                case 1: return 360;
+                case 2: return 480;
+                case 3: return 720;
+                case 4: return 1080;
+                case 5: return 1440;
+                case 6: return 2160;
+                default: return 0;
+            }
+        }
+
         private void UpdateUrlPreview()
         {
-            string extracted = ExtractFirstUrl(urlBox.Text);
+            string extracted = ExtractPreferredUrl(urlBox.Text);
             urlPreview.Text = extracted == null ? "识别到的网址：尚未找到" : "识别到的网址：" + extracted;
             urlPreview.ForeColor = extracted == null ? Color.FromArgb(129, 139, 154) : Color.FromArgb(29, 111, 131);
         }
@@ -336,7 +408,7 @@ namespace YtDlpGuiMvp
 
         private void DownloadClicked(object sender, EventArgs e)
         {
-            string url = ExtractFirstUrl(urlBox.Text);
+            string url = ExtractPreferredUrl(urlBox.Text);
             if (!Uri.IsWellFormedUriString(url, UriKind.Absolute) ||
                 !(url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
             {
@@ -432,7 +504,17 @@ namespace YtDlpGuiMvp
             args.Append("--ffmpeg-location ").Append(Quote(appDir)).Append(' ');
             args.Append("-P ").Append(Quote(folder)).Append(' ');
             if (firefoxBox.Checked) args.Append("--cookies-from-browser firefox ");
-            if (selectedMode == 0) args.Append("-t mp4 ");
+            if (selectedMode == 0)
+            {
+                args.Append("-t mp4 ");
+                int preferredResolution = SelectedPreferredResolution();
+                if (preferredResolution > 0)
+                {
+                    string resolution = preferredResolution.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    args.Append("-S ").Append(Quote("res:" + resolution)).Append(' ');
+                    args.Append("-o ").Append(Quote("%(title)s [%(id)s] [%(resolution)s].%(ext)s")).Append(' ');
+                }
+            }
             else if (selectedMode == 1) args.Append("-t mp3 ");
             else args.Append("--write-subs --write-auto-subs --sub-langs ").Append(Quote(SelectedSubtitleLanguage())).Append(" --convert-subs srt --skip-download ");
             args.Append(Quote(url));
@@ -701,6 +783,7 @@ namespace YtDlpGuiMvp
             urlBox.Enabled = !busy;
             foreach (Button button in modeButtons) button.Enabled = !busy;
             subtitleLanguageBox.Enabled = !busy && selectedMode == 2;
+            videoResolutionBox.Enabled = !busy && selectedMode == 0;
             firefoxBox.Enabled = !busy;
             playlistBox.Enabled = !busy;
         }
