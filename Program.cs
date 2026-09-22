@@ -1,13 +1,34 @@
+#region Namespace Dependencies
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Collections.Generic;
-using System.ComponentModel;
+using System.Reflection;
+using System.Resources;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using System.Security;
+using System.Security.Permissions;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
+#endregion /* Namespace Dependencies */
+
+#region Assembly Information
+// 程序集的相關信息，修改以下特性値以更新程序集的關聯信息。
+[assembly: AssemblyProduct("yt-dlp-gui")]
+[assembly: AssemblyCopyright("MIT License")]
+[assembly: AssemblyTitle("yt-dlp Portable Lightweight GUI (Recommended for Windows 10/11 x64)")]
+[assembly: AssemblyDescription("https://github.com/linblank/yt-dlp-gui-for-beginners")]
+// 程序集的版本信息
+[assembly: AssemblyFileVersion("0.6.1")]
+[assembly: AssemblyInformationalVersion("Release")]
+[assembly: AssemblyVersion("0.6.*")]
+#endregion /* Assembly Information */
 
 namespace YtDlpGuiMvp
 {
@@ -21,8 +42,8 @@ namespace YtDlpGuiMvp
             Version windows = Environment.OSVersion.Version;
             if (IsWindows7OrOlder(Environment.OSVersion.Platform, windows))
             {
-                MessageBox.Show("此公开版使用的 yt-dlp 官方程序已不支持 Windows 7，因此无法通过安装或复制 python310.dll 修复。\n\n请在 Windows 10/11 x64 上使用。若必须继续使用 Windows 7，需要另行维护和测试专用的旧版组件组合；本程序不会在 Win7 上自动下载不兼容的组件。",
-                    "Windows 7 不受支持", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                 MessageBox.Show("此公開版使用的 yt-dlp 官方程式已不支援 Windows 7，因此無法透過安裝或複製 python310.dll 來修復。\n\n請在 Windows 10/11 x64 上使用。若必須繼續使用 Windows 7，需要自行維護和測試專用的舊版元件組合；本程式不會在 Win7 上自動下載不相容的元件。",
+                                 "Windows 7 不受支援", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             Application.Run(new MainForm());
@@ -53,35 +74,38 @@ namespace YtDlpGuiMvp
 
     internal sealed class MainForm : Form
     {
-        private readonly ReplaceOnPasteTextBox urlBox = new ReplaceOnPasteTextBox();
-        private readonly Button[] modeButtons = { new Button(), new Button(), new Button() };
-        private readonly ComboBox subtitleLanguageBox = new ComboBox();
-        private readonly ComboBox videoResolutionBox = new ComboBox();
-        private int selectedMode;
-        private readonly TextBox folderBox = new TextBox();
-        private readonly CheckBox firefoxBox = new CheckBox();
-        private readonly CheckBox playlistBox = new CheckBox();
-        private readonly Button browseButton = new Button();
-        private readonly Button downloadButton = new Button();
-        private readonly Button cancelButton = new Button();
-        private readonly Button openButton = new Button();
-        private readonly Button updateButton = new Button();
-        private readonly ProgressBar progress = new ProgressBar();
-        private readonly Label status = new Label();
-        private readonly Label urlPreview = new Label();
-        private readonly Label savePreview = new Label();
-        private readonly TextBox logBox = new TextBox();
-        private readonly ToolTip tips = new ToolTip();
-        private readonly SynchronizationContext ui;
-        private volatile Process currentProcess;
-        private volatile bool cancelling;
-        private volatile bool noSubtitles;
-        private string lastErrorMessage;
-        private bool isDouyinDownload;
-        private bool douyinCookieError;
-        private string lastFolder;
-        private readonly Regex percentPattern = new Regex(@"\[download\]\s+(\d+(?:\.\d+)?)%", RegexOptions.Compiled);
-        private static readonly Regex urlPattern = new Regex("https?://[^\\s<>\\[\\]\\(\\)（）“”\\\"'，。；！？、]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private         volatile bool                   cancelling;
+        private                  bool                   douyinCookieError;
+        private                  bool                   isDouyinDownload;
+        private         volatile bool                   noSubtitles;
+        private         volatile Process                currentProcess;
+        private                  int                    selectedMode;
+        private                  string                 lastErrorMessage;
+        private                  string                 lastFolder;
+
+        private         readonly Regex                  percentPattern          = new Regex(@"\[download\]\s+(\d+(?:\.\d+)?)%", RegexOptions.Compiled);
+        private static  readonly Regex                  urlPattern              = new Regex("https?://[^\\s<>\\[\\]\\(\\)（）“”\\\"'，。；！？、]+",
+                                                                                            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private         readonly SynchronizationContext ui;
+
+        private         readonly Button                 btnBrowse               = new Button();
+        private         readonly Button                 btnCancel               = new Button();
+        private         readonly Button                 btnDownload             = new Button();
+        private         readonly Button                 btnOpenDownloadFolder   = new Button();
+        private         readonly Button                 btnUpdateComponents     = new Button();
+        private         readonly Button[]               btnSelectMode           = { new Button(), new Button(), new Button() };
+        private         readonly CheckBox               chkFirefox              = new CheckBox();
+        private         readonly CheckBox               chkPlaylist             = new CheckBox();
+        private         readonly ComboBox               cmbSubtitleLanguage     = new ComboBox();
+        private         readonly ComboBox               cmbVideoResolution      = new ComboBox();
+        private         readonly Label                  lblStatus               = new Label();
+        private         readonly Label                  lblSavePreview          = new Label();
+        private         readonly Label                  lblUrlPreview           = new Label();
+        private         readonly ProgressBar            progress                = new ProgressBar();
+        private         readonly ReplaceOnPasteTextBox  txtUrl                  = new ReplaceOnPasteTextBox();
+        private         readonly TextBox                txtLog                  = new TextBox();
+        private         readonly TextBox                txtSavePath             = new TextBox();
+        private         readonly ToolTip                ttpTips                 = new ToolTip();
 
         private sealed class SubtitleSnapshot
         {
@@ -91,27 +115,34 @@ namespace YtDlpGuiMvp
 
         public MainForm(bool checkComponentsOnShown = true)
         {
-            ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
-            Text = "视频音频字幕下载 · MVP v0.6.1";
-            Icon = SystemIcons.Application;
-            MinimumSize = new Size(760, 700);
-            Size = new Size(960, 760);
-            StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.FromArgb(237, 242, 248);
-            Padding = new Padding(14);
-            Font = new Font("Microsoft YaHei UI", 10F);
+            var version     = Assembly.GetExecutingAssembly().GetName().Version;
+
+            AutoScaleMode   = System.Windows.Forms.AutoScaleMode.None/* System.Windows.Forms.AutoScaleMode.Font */;
+            BackColor       = Color.FromArgb(237, 242, 248);
+            Font            = new Font("Microsoft YaHei UI", 10F);
+            Icon            = SystemIcons.Application;
+            MinimumSize     = new Size(760, 700);
+            Padding         = new Padding(14);
+            Size            = new Size(960, 800);
+            StartPosition   = FormStartPosition.CenterScreen;
+            Text            = Process.GetCurrentProcess().ProcessName + " · MVP v" +
+                              FileVersionInfo.GetVersionInfo(this.GetType().Assembly.Location).FileVersion +
+                              "(" + Application.ProductVersion + " Revison: " + version.Revision + ", " +
+                              " Build: " + version.Build + ")";
+            ui              = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
+
             BuildUi();
             if (checkComponentsOnShown) Shown += (s, e) => CheckComponentsOnStartup();
         }
 
         private void BuildUi()
         {
-            var root = new TableLayoutPanel();
-            root.Dock = DockStyle.Fill;
-            root.Padding = new Padding(28, 20, 28, 20);
-            root.BackColor = Color.White;
-            root.ColumnCount = 1;
-            root.RowCount = 16;
+            var root                                        = new TableLayoutPanel();
+            root.Dock                                       = DockStyle.Fill;
+            root.Padding                                    = new Padding(28, 20, 28, 20);
+            root.BackColor                                  = Color.White;
+            root.ColumnCount                                = 1;
+            root.RowCount                                   = 16;
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 55));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 27));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 27));
@@ -120,7 +151,7 @@ namespace YtDlpGuiMvp
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 43));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 27));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 43));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 29));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 43));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
@@ -130,202 +161,217 @@ namespace YtDlpGuiMvp
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Controls.Add(root);
 
-            var title = new Label();
-            title.Text = "视频音频字幕下载";
-            title.Font = new Font("Microsoft YaHei UI", 20F, FontStyle.Bold);
-            title.ForeColor = Color.FromArgb(27, 43, 67);
-            title.Dock = DockStyle.Fill;
+            var title                                       = new Label();
+            title.Dock                                      = DockStyle.Fill;
+            title.Font                                      = new Font("Microsoft YaHei UI", 20F, FontStyle.Bold);
+            title.ForeColor                                 = Color.FromArgb(27, 43, 67);
+            title.Text                                      = "影片/音訊/字幕下載";
             root.Controls.Add(title, 0, 0);
 
-            var subtitle = MakeLabel("复制分享文案或视频网址，选择格式，然后点击开始下载。");
-            subtitle.ForeColor = Color.FromArgb(101, 116, 139);
+            var subtitle                                    = MakeLabel("複製分享文案或影片網址，選擇格式，然後點擊開始下載。");
+            subtitle.ForeColor                              = Color.FromArgb(101, 116, 139);
             root.Controls.Add(subtitle, 0, 1);
-            root.Controls.Add(MakeLabel("分享文字或视频网址（粘贴新内容会自动替换旧内容）"), 0, 2);
-            urlBox.Dock = DockStyle.Fill;
-            urlBox.Multiline = true;
-            urlBox.ScrollBars = ScrollBars.Vertical;
-            urlBox.BorderStyle = BorderStyle.FixedSingle;
-            urlBox.BackColor = Color.FromArgb(250, 252, 255);
-            urlBox.Font = new Font("Microsoft YaHei UI", 10.5F);
-            urlBox.TextChanged += (s, e) => UpdateUrlPreview();
-            root.Controls.Add(urlBox, 0, 3);
-            urlPreview.Dock = DockStyle.Fill;
-            urlPreview.TextAlign = ContentAlignment.MiddleLeft;
-            urlPreview.ForeColor = Color.FromArgb(29, 111, 131);
-            urlPreview.AutoEllipsis = true;
-            root.Controls.Add(urlPreview, 0, 4);
+            root.Controls.Add(MakeLabel("分享文字或影片網址（貼上新內容會自動取代舊內容）"), 0, 2);
 
-            var optionRow = new FlowLayoutPanel();
-            optionRow.Dock = DockStyle.Fill;
-            optionRow.WrapContents = false;
-            optionRow.FlowDirection = FlowDirection.LeftToRight;
-            var downloadTypeLabel = MakeLabel("下载类型");
-            downloadTypeLabel.Dock = DockStyle.None;
-            downloadTypeLabel.Size = new Size(98, 40);
-            downloadTypeLabel.Margin = new Padding(0, 0, 0, 0);
+            txtUrl.BackColor                                = Color.FromArgb(250, 252, 255);
+            txtUrl.BorderStyle                              = BorderStyle.FixedSingle;
+            txtUrl.Dock                                     = DockStyle.Fill;
+            txtUrl.Font                                     = new Font("Microsoft YaHei UI", 10.5F);
+            txtUrl.Multiline                                = true;
+            txtUrl.ScrollBars                               = ScrollBars.Vertical;
+            txtUrl.TextChanged                             += (s, e) => txtUrl_EventHandler_TextChanged_UpdatePreview();
+            root.Controls.Add(txtUrl, 0, 3);
+
+            lblUrlPreview.AutoEllipsis                      = true;
+            lblUrlPreview.Dock                              = DockStyle.Fill;
+            lblUrlPreview.ForeColor                         = Color.FromArgb(29, 111, 131);
+            lblUrlPreview.TextAlign                         = ContentAlignment.MiddleLeft;
+            root.Controls.Add(lblUrlPreview, 0, 4);
+
+            var optionRow                                   = new FlowLayoutPanel();
+            optionRow.Dock                                  = DockStyle.Fill;
+            optionRow.FlowDirection                         = FlowDirection.LeftToRight;
+            optionRow.WrapContents                          = false;
+            var downloadTypeLabel                           = MakeLabel("下載類型");
+            downloadTypeLabel.Dock                          = DockStyle.None;
+            downloadTypeLabel.Margin                        = new Padding(0, 0, 0, 0);
+            downloadTypeLabel.Size                          = new Size(98, 40);
             optionRow.Controls.Add(downloadTypeLabel);
             for (int i = 0; i < 3; i++)
             {
                 int index = i;
-                modeButtons[i].Text = new[] { "视频 MP4", "音频 MP3", "字幕 SRT" }[i];
-                modeButtons[i].Size = new Size(112, 36);
-                modeButtons[i].Dock = DockStyle.None;
-                modeButtons[i].Margin = new Padding(0, 2, 5, 0);
-                modeButtons[i].FlatStyle = FlatStyle.Flat;
-                modeButtons[i].FlatAppearance.BorderSize = 1;
-                modeButtons[i].UseVisualStyleBackColor = false;
-                modeButtons[i].TextAlign = ContentAlignment.MiddleCenter;
-                modeButtons[i].Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
-                modeButtons[i].Cursor = Cursors.Hand;
-                modeButtons[i].Click += (s, e) => SelectMode(index);
-                optionRow.Controls.Add(modeButtons[i]);
+                btnSelectMode[i].Click                     += (s, e) => btnSelectMode_EventHandler_Click_SelectMode(index);
+                btnSelectMode[i].Cursor                     = Cursors.Hand;
+                btnSelectMode[i].Dock                       = DockStyle.None;
+                btnSelectMode[i].Font                       = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
+                btnSelectMode[i].FlatStyle                  = FlatStyle.Flat;
+                btnSelectMode[i].FlatAppearance.BorderSize  = 1;
+                btnSelectMode[i].Margin                     = new Padding(0, 2, 5, 0);
+                btnSelectMode[i].Size                       = new Size(112, 36);
+                btnSelectMode[i].Text                       = new[] { "影片 MP4", "音訊 MP3", "字幕 SRT" }[i];
+                btnSelectMode[i].TextAlign                  = ContentAlignment.MiddleCenter;
+                btnSelectMode[i].UseVisualStyleBackColor    = false;
+                optionRow.Controls.Add(btnSelectMode[i]);
             }
-            var languageLabel = MakeLabel("字幕语言");
-            languageLabel.Dock = DockStyle.None;
-            languageLabel.Size = new Size(77, 40);
-            languageLabel.Margin = new Padding(9, 0, 0, 0);
+            var languageLabel                               = MakeLabel("字幕語言");
+            languageLabel.Dock                              = DockStyle.None;
+            languageLabel.Margin                            = new Padding(9, 0, 0, 0);
+            languageLabel.Size                              = new Size(77, 40);
             optionRow.Controls.Add(languageLabel);
-            subtitleLanguageBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            subtitleLanguageBox.Items.AddRange(new object[] { "简体中文", "繁体中文", "英文" });
-            subtitleLanguageBox.SelectedIndex = 0;
-            subtitleLanguageBox.Dock = DockStyle.None;
-            subtitleLanguageBox.Width = 133;
-            subtitleLanguageBox.Margin = new Padding(0, 5, 0, 0);
-            subtitleLanguageBox.FlatStyle = FlatStyle.Standard;
-            optionRow.Controls.Add(subtitleLanguageBox);
+
+            cmbSubtitleLanguage.Dock                        = DockStyle.None;
+            cmbSubtitleLanguage.DropDownStyle               = ComboBoxStyle.DropDownList;
+            cmbSubtitleLanguage.FlatStyle                   = FlatStyle.Standard;
+            cmbSubtitleLanguage.Items.AddRange(new object[] { "簡體中文", "正體中文", "英文" });
+            cmbSubtitleLanguage.Margin                      = new Padding(0, 5, 0, 0);
+            cmbSubtitleLanguage.SelectedIndex               = 0;
+            cmbSubtitleLanguage.Width                       = 133;
+            optionRow.Controls.Add(cmbSubtitleLanguage);
             root.Controls.Add(optionRow, 0, 5);
 
-            var resolutionRow = new FlowLayoutPanel();
-            resolutionRow.Dock = DockStyle.Fill;
-            resolutionRow.WrapContents = false;
-            var resolutionLabel = MakeLabel("视频目标分辨率");
-            resolutionLabel.Dock = DockStyle.None;
-            resolutionLabel.Size = new Size(143, 38);
+            var resolutionRow                               = new FlowLayoutPanel();
+            resolutionRow.Dock                              = DockStyle.Fill;
+            resolutionRow.WrapContents                      = false;
+            var resolutionLabel                             = MakeLabel("影片目標解析度");
+            resolutionLabel.Dock                            = DockStyle.None;
+            resolutionLabel.Size                            = new Size(143, 38);
             resolutionRow.Controls.Add(resolutionLabel);
-            videoResolutionBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            videoResolutionBox.Items.AddRange(new object[] {
-                "自动（原有选择）", "优先 360p", "优先 480p", "优先 720p",
-                "优先 1080p", "优先 1440p（2K）", "优先 2160p（4K）"
-            });
-            videoResolutionBox.SelectedIndex = 0;
-            videoResolutionBox.Width = 190;
-            videoResolutionBox.Margin = new Padding(0, 5, 12, 0);
-            videoResolutionBox.FlatStyle = FlatStyle.Standard;
-            resolutionRow.Controls.Add(videoResolutionBox);
-            var resolutionHint = MakeLabel("按片源实际画质选择，不会放大画面");
-            resolutionHint.Dock = DockStyle.None;
-            resolutionHint.Size = new Size(310, 38);
-            resolutionHint.ForeColor = Color.FromArgb(101, 116, 139);
+            cmbVideoResolution.DropDownStyle                = ComboBoxStyle.DropDownList;
+            cmbVideoResolution.FlatStyle                    = FlatStyle.Standard;
+            cmbVideoResolution.Items.AddRange(new object[] {"自動（原有選擇）",
+                                                            " 360p 優先",
+                                                            " 480p 優先",
+                                                            " 720p 優先",
+                                                            "1080p 優先",
+                                                            "1440p 優先",
+                                                            "2160p 優先"});
+            cmbVideoResolution.Margin                       = new Padding(0, 5, 12, 0);
+            cmbVideoResolution.SelectedIndex                = 0;
+            cmbVideoResolution.Width                        = 190;
+            resolutionRow.Controls.Add(cmbVideoResolution);
+            var resolutionHint                              = MakeLabel("按片源實際畵質選擇，不會放大畵面");
+            resolutionHint.Dock                             = DockStyle.None;
+            resolutionHint.ForeColor                        = Color.FromArgb(101, 116, 139);
+            resolutionHint.Size                             = new Size(310, 38);
             resolutionRow.Controls.Add(resolutionHint);
             root.Controls.Add(resolutionRow, 0, 6);
-            tips.SetToolTip(videoResolutionBox, "优先选不高于目标的最佳画质；如果片源只提供更高画质，会选它提供的最低画质。竖屏视频也按较短边判断。");
-            SelectMode(0);
+            ttpTips.SetToolTip(cmbVideoResolution, "優先選不高於目標的最佳畵質；如果片源只提供更高畵質，會選它提供的最低畵質。直屏影片也按較短邊判斷。");
+            btnSelectMode_EventHandler_Click_SelectMode(0);
+            root.Controls.Add(MakeLabel("保存根目録（自動按類型分類）"), 0, 7);
 
-            root.Controls.Add(MakeLabel("保存根目录（自动按类型分类）"), 0, 7);
-
-            var folderRow = new TableLayoutPanel();
-            folderRow.Dock = DockStyle.Fill;
-            folderRow.ColumnCount = 2;
-            folderRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            folderRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
-            folderBox.Dock = DockStyle.Fill;
-            folderBox.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "yt-dlp 下载");
-            folderBox.BorderStyle = BorderStyle.FixedSingle;
-            folderBox.BackColor = Color.FromArgb(250, 252, 255);
-            folderBox.TextChanged += (s, e) => UpdateSavePreview();
-            folderRow.Controls.Add(folderBox, 0, 0);
-            browseButton.Text = "选择目录";
-            browseButton.Dock = DockStyle.Fill;
-            StyleButton(browseButton, Color.FromArgb(231, 237, 245), Color.FromArgb(36, 53, 77));
-            browseButton.Click += BrowseClicked;
-            folderRow.Controls.Add(browseButton, 1, 0);
+            var folderRow                                   = new TableLayoutPanel();
+            folderRow.Dock                                  = DockStyle.Fill;
+            folderRow.ColumnCount                           = 2;
+            folderRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent , 150));
+            folderRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,  40));
+            txtSavePath.BackColor                           = Color.FromArgb(250, 252, 255);
+            txtSavePath.BorderStyle                         = BorderStyle.FixedSingle;
+            txtSavePath.Dock                                = DockStyle.Fill;
+            txtSavePath.Font                                = new Font("Microsoft YaHei UI", 10.5F);
+            txtSavePath.Text                                = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop), "yt-dlp");
+            txtSavePath.TextChanged                        += (s, e) => txtSavePath_EventHandler_TextChanged_UpdateFolderPreview();
+            folderRow.Controls.Add(txtSavePath, 0, 0);
+            btnBrowse.Dock                                  = DockStyle.Fill;
+            btnBrowse.Text                                  = "···";
+          //btnBrowse.TextAlign                             = ContentAlignment.MiddleCenter;
+            StyleButton(btnBrowse, Color.FromArgb(231, 237, 245), Color.FromArgb(36, 53, 77));
+            btnBrowse.Click                                += btnBrowse_EventHandler_Click;
+            folderRow.Controls.Add(btnBrowse, 1, 0);
             root.Controls.Add(folderRow, 0, 8);
-            savePreview.Dock = DockStyle.Fill;
-            savePreview.TextAlign = ContentAlignment.MiddleLeft;
-            savePreview.ForeColor = Color.FromArgb(88, 101, 119);
-            savePreview.AutoEllipsis = true;
-            root.Controls.Add(savePreview, 0, 9);
+            lblSavePreview.AutoEllipsis                     = true;
+            lblSavePreview.Dock                             = DockStyle.Fill;
+            lblSavePreview.ForeColor                        = Color.FromArgb(88, 101, 119);
+            lblSavePreview.TextAlign                        = ContentAlignment.MiddleLeft;
+            root.Controls.Add(lblSavePreview, 0, 9);
 
-            var checkRow = new FlowLayoutPanel();
-            checkRow.Dock = DockStyle.Fill;
-            checkRow.FlowDirection = FlowDirection.LeftToRight;
-            firefoxBox.Text = "读取 Firefox Cookies（需要验证时）";
-            firefoxBox.AutoSize = true;
-            firefoxBox.Margin = new Padding(0, 10, 24, 0);
-            playlistBox.Text = "下载整个播放列表";
-            playlistBox.AutoSize = true;
-            playlistBox.Margin = new Padding(0, 10, 0, 0);
-            checkRow.Controls.Add(firefoxBox);
-            checkRow.Controls.Add(playlistBox);
+            var checkRow                                    = new FlowLayoutPanel();
+            chkFirefox.AutoSize                             = true;
+            checkRow.Dock                                   = DockStyle.Fill;
+            checkRow.FlowDirection                          = FlowDirection.LeftToRight;
+            chkFirefox.Margin                               = new Padding(0, 10, 24, 0);
+            chkFirefox.Text                                 = "讀取 Firefox Cookies（需要驗證時）";
+
+            chkPlaylist.AutoSize                            = true;
+            chkPlaylist.Text                                = "下載播放列表";
+            chkPlaylist.Margin                              = new Padding(0, 10, 0, 0);
+            checkRow.Controls.Add(chkFirefox);
+            checkRow.Controls.Add(chkPlaylist);
             root.Controls.Add(checkRow, 0, 10);
-            tips.SetToolTip(firefoxBox, "先用 Firefox 打开目标视频站点并刷新页面，再勾选。Cookies 可能包含登录状态。");
+            ttpTips.SetToolTip(chkFirefox, "先用 Firefox 打開影片目標網址並刷新頁面，再勾選。Cookies 可能包含登録狀態。");
 
-            var buttonRow = new FlowLayoutPanel();
-            buttonRow.Dock = DockStyle.Fill;
-            buttonRow.Controls.Add(downloadButton);
-            buttonRow.Controls.Add(cancelButton);
-            buttonRow.Controls.Add(openButton);
-            buttonRow.Controls.Add(updateButton);
-            downloadButton.Text = "开始下载";
-            downloadButton.Width = 145;
-            StyleButton(downloadButton, Color.FromArgb(32, 103, 201), Color.White);
-            downloadButton.Click += DownloadClicked;
-            cancelButton.Text = "取消";
-            cancelButton.Width = 92;
-            StyleButton(cancelButton, Color.FromArgb(231, 237, 245), Color.FromArgb(36, 53, 77));
-            cancelButton.Enabled = false;
-            cancelButton.Click += CancelClicked;
-            openButton.Text = "打开保存目录";
-            openButton.Width = 140;
-            StyleButton(openButton, Color.FromArgb(231, 237, 245), Color.FromArgb(36, 53, 77));
-            openButton.Click += OpenClicked;
-            updateButton.Text = "检查运行组件";
-            updateButton.Width = 155;
-            StyleButton(updateButton, Color.FromArgb(221, 241, 238), Color.FromArgb(17, 105, 98));
-            updateButton.Click += UpdateClicked;
-            tips.SetToolTip(updateButton, "检查四个运行组件；缺少时从官方 GitHub 下载并校验，完整时可更新 yt-dlp。");
+            var buttonRow                                   = new FlowLayoutPanel();
+            buttonRow.Dock                                  = DockStyle.Fill;
+            buttonRow.Controls.Add(btnDownload);
+            buttonRow.Controls.Add(btnCancel);
+            buttonRow.Controls.Add(btnOpenDownloadFolder);
+            buttonRow.Controls.Add(btnUpdateComponents);
+            btnDownload.Text                                = "開始下載";
+            btnCancel.TextAlign                             = ContentAlignment.MiddleCenter;
+            btnDownload.Width                               = 145;
+            StyleButton(btnDownload, Color.FromArgb(32, 103, 201), Color.White);
+            btnDownload.Click                              += btnDownload_EventHandler_Click;
+            btnCancel.Text                                  = "取消";
+            btnCancel.TextAlign                             = ContentAlignment.MiddleCenter;
+            btnCancel.Width                                 = 92;
+            StyleButton(btnCancel, Color.FromArgb(231, 237, 245), Color.FromArgb(36, 53, 77));
+            btnCancel.Click                                += btnCancel_EventHandler_Click;
+            btnCancel.Enabled                               = false;
+            btnOpenDownloadFolder.Text                      = "打開保存目録";
+            btnOpenDownloadFolder.TextAlign                 = ContentAlignment.MiddleCenter;
+            btnOpenDownloadFolder.Width                     = 140;
+            StyleButton(btnOpenDownloadFolder, Color.FromArgb(231, 237, 245), Color.FromArgb(36, 53, 77));
+            btnOpenDownloadFolder.Click                    += btnOpenDownloadFolder_EventHandler_Click;
+            btnUpdateComponents.Text                        = "檢查運行組件";
+            btnUpdateComponents.TextAlign                   = ContentAlignment.MiddleCenter;
+            btnUpdateComponents.Width                       = 155;
+            StyleButton(btnUpdateComponents, Color.FromArgb(221, 241, 238), Color.FromArgb(17, 105, 98));
+            btnUpdateComponents.Click                      += btnUpdateComponents_EventHandler_Click;
+            ttpTips.SetToolTip(btnUpdateComponents, "檢查四箇運行組件；缺少時從官方 GitHub 下載並校驗，完整時可更新 yt-dlp。");
             root.Controls.Add(buttonRow, 0, 11);
 
-            progress.Dock = DockStyle.Fill;
-            progress.Minimum = 0;
-            progress.Maximum = 100;
+            progress.Dock                                   = DockStyle.Fill;
+            progress.Minimum                                = 0;
+            progress.Maximum                                = 100;
             root.Controls.Add(progress, 0, 12);
-            status.Text = "就绪";
-            status.Dock = DockStyle.Fill;
-            status.ForeColor = Color.FromArgb(70, 82, 96);
-            status.AutoEllipsis = true;
-            root.Controls.Add(status, 0, 13);
-            root.Controls.Add(MakeLabel("运行记录（不显示 Cookies 内容）"), 0, 14);
-            logBox.Multiline = true;
-            logBox.ScrollBars = ScrollBars.Vertical;
-            logBox.ReadOnly = true;
-            logBox.Dock = DockStyle.Fill;
-            logBox.BorderStyle = BorderStyle.FixedSingle;
-            logBox.BackColor = Color.FromArgb(250, 252, 255);
-            logBox.Font = new Font("Consolas", 9F);
-            root.Controls.Add(logBox, 0, 15);
-            UpdateUrlPreview();
-            UpdateSavePreview();
+
+            lblStatus.AutoEllipsis                          = true;
+            lblStatus.Dock                                  = DockStyle.Fill;
+            lblStatus.ForeColor                             = Color.FromArgb(70, 82, 96);
+            lblStatus.Text                                  = "就緒";
+            root.Controls.Add(lblStatus, 0, 13);
+            root.Controls.Add(MakeLabel("運行日誌（不顯示 Cookies 内容）"), 0, 14);
+
+            txtLog.BackColor                                = Color.FromArgb(250, 252, 255);
+            txtLog.BorderStyle                              = BorderStyle.FixedSingle;
+            txtLog.Dock                                     = DockStyle.Fill;
+            txtLog.Font                                     = new Font("Consolas", 9F);
+            txtLog.Multiline                                = true;
+            txtLog.ReadOnly                                 = true;
+            txtLog.ScrollBars                               = ScrollBars.Vertical;
+            root.Controls.Add(txtLog, 0, 15);
+            txtUrl_EventHandler_TextChanged_UpdatePreview();
+            txtSavePath_EventHandler_TextChanged_UpdateFolderPreview();
         }
 
-        private static void StyleButton(Button button, Color background, Color foreground)
+        private static void StyleButton(Button btn, Color background, Color foreground)
         {
-            button.Height = 38;
-            button.BackColor = background;
-            button.ForeColor = foreground;
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderSize = 0;
-            button.Margin = new Padding(0, 4, 10, 0);
-            button.Cursor = Cursors.Hand;
+            btn.BackColor                   = background;
+            btn.Cursor                      = Cursors.Hand;
+            btn.FlatStyle                   = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize   = 0;
+            btn.ForeColor                   = foreground;
+            btn.Height                      = 38;
+            btn.Margin                      = new Padding(0, 4, 10, 0);
         }
 
         private Label MakeLabel(string value)
         {
-            var label = new Label();
-            label.Text = value;
-            label.Dock = DockStyle.Fill;
-            label.TextAlign = ContentAlignment.MiddleLeft;
-            label.ForeColor = Color.FromArgb(76, 92, 112);
+            var label                       = new Label();
+            label.ForeColor                 = Color.FromArgb(76, 92, 112);
+            label.Dock                      = DockStyle.Fill;
+            label.Text                      = value;
+            label.TextAlign                 = ContentAlignment.MiddleLeft;
+
             return label;
         }
 
@@ -333,43 +379,24 @@ namespace YtDlpGuiMvp
         {
             if (String.IsNullOrWhiteSpace(input)) return null;
             MatchCollection matches = urlPattern.Matches(input);
-            if (matches.Count == 0) return null;
-            Match match = matches[matches.Count - 1];
+            if (0 == matches.Count) return null;
+            Match match             = matches[matches.Count - 1];
             return match.Value.TrimEnd('.', ',', ';', '!', '。', '，', '；', '！', '？', '、');
         }
 
         private static string ModeSubfolder(int mode)
         {
-            if (mode == 1) return "mp3";
-            if (mode == 2) return "subtitles";
-            return "mp4";
-        }
-
-        private void SelectMode(int mode)
-        {
-            selectedMode = mode;
-            for (int i = 0; i < modeButtons.Length; i++)
-            {
-                bool selected = i == mode;
-                modeButtons[i].BackColor = selected ? Color.FromArgb(32, 103, 201) : Color.FromArgb(239, 244, 251);
-                modeButtons[i].ForeColor = selected ? Color.White : Color.FromArgb(36, 53, 77);
-                modeButtons[i].FlatAppearance.BorderColor = selected ? Color.FromArgb(21, 82, 173) : Color.FromArgb(195, 208, 225);
-            }
-            subtitleLanguageBox.Enabled = mode == 2 && downloadButton.Enabled;
-            videoResolutionBox.Enabled = mode == 0 && downloadButton.Enabled;
-            UpdateSavePreview();
+            return (1 == mode) ? "mp3" : ((2 == mode) ? "subtitles" :  "mp4");
         }
 
         private string SelectedSubtitleLanguage()
         {
-            if (subtitleLanguageBox.SelectedIndex == 1) return "^zh-Hant$";
-            if (subtitleLanguageBox.SelectedIndex == 2) return "^en$";
-            return "^zh-Hans$";
+            return (1 == cmbSubtitleLanguage.SelectedIndex) ? "^zh-Hant$" : ((2 == cmbSubtitleLanguage.SelectedIndex) ? "^en$" :  "^zh-Hans$");
         }
 
         private int SelectedPreferredResolution()
         {
-            switch (videoResolutionBox.SelectedIndex)
+            switch (cmbVideoResolution.SelectedIndex)
             {
                 case 1: return 360;
                 case 2: return 480;
@@ -379,113 +406,6 @@ namespace YtDlpGuiMvp
                 case 6: return 2160;
                 default: return 0;
             }
-        }
-
-        private void UpdateUrlPreview()
-        {
-            string extracted = ExtractPreferredUrl(urlBox.Text);
-            urlPreview.Text = extracted == null ? "识别到的网址：尚未找到" : "识别到的网址：" + extracted;
-            urlPreview.ForeColor = extracted == null ? Color.FromArgb(129, 139, 154) : Color.FromArgb(29, 111, 131);
-        }
-
-        private void UpdateSavePreview()
-        {
-            string rootFolder = folderBox.Text.Trim();
-            if (rootFolder.Length == 0) { savePreview.Text = "本次保存到：请选择根目录"; return; }
-            try { savePreview.Text = "本次保存到：" + Path.Combine(rootFolder, ModeSubfolder(selectedMode)); }
-            catch (ArgumentException) { savePreview.Text = "本次保存到：目录名称无效"; }
-        }
-
-        private void BrowseClicked(object sender, EventArgs e)
-        {
-            using (var dialog = new FolderBrowserDialog())
-            {
-                dialog.Description = "选择下载文件保存目录";
-                if (Directory.Exists(folderBox.Text)) dialog.SelectedPath = folderBox.Text;
-                if (dialog.ShowDialog(this) == DialogResult.OK) folderBox.Text = dialog.SelectedPath;
-            }
-        }
-
-        private void DownloadClicked(object sender, EventArgs e)
-        {
-            string url = ExtractPreferredUrl(urlBox.Text);
-            if (!Uri.IsWellFormedUriString(url, UriKind.Absolute) ||
-                !(url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
-            {
-                MessageBox.Show(this, "没有识别到有效的视频网址。可以直接粘贴抖音等平台的整段分享文字。", "链接无效", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            string rootFolder = folderBox.Text.Trim();
-            if (rootFolder.Length == 0 || !Path.IsPathRooted(rootFolder))
-            {
-                MessageBox.Show(this, "请选择完整的保存根目录。", "缺少目录", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            string folder;
-            try { folder = Path.Combine(rootFolder, ModeSubfolder(selectedMode)); }
-            catch (ArgumentException)
-            {
-                MessageBox.Show(this, "保存目录名称无效。", "目录错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            string appDir = AppDomain.CurrentDomain.BaseDirectory;
-            string ytDlp = Path.Combine(appDir, "yt-dlp.exe");
-            string[] missing = ComponentInstaller.MissingComponents(appDir);
-            if (missing.Length > 0)
-            {
-                DialogResult install = MessageBox.Show(this,
-                    "程序目录缺少以下组件：\n\n" + String.Join("\n", missing) +
-                    "\n\n是否现在从各项目的官方 GitHub 下载并校验？也可以取消后手动放入程序目录。",
-                    "需要安装运行组件", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-                if (install == DialogResult.Yes) StartComponentInstall();
-                return;
-            }
-
-            isDouyinDownload = IsDouyinUrl(url);
-            bool cookiesConfirmed = false;
-            if (isDouyinDownload && !firefoxBox.Checked)
-            {
-                var choice = MessageBox.Show(this,
-                    "抖音经常要求新鲜 Cookies（不一定需要登录）。请先在 Firefox 中打开这条抖音链接并刷新页面。\n\n现在从 Firefox 读取 Cookies 吗？选择“否”会继续尝试无 Cookies 下载，但可能失败。",
-                    "抖音访问提示", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information);
-                if (choice == DialogResult.Cancel) return;
-                if (choice == DialogResult.Yes) { firefoxBox.Checked = true; cookiesConfirmed = true; }
-            }
-            if (playlistBox.Checked && MessageBox.Show(this, "你选择了下载整个播放列表。请确认链接中的播放列表数量不会过大。", "确认批量下载", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
-            if (firefoxBox.Checked && !cookiesConfirmed && MessageBox.Show(this, "将从 Firefox 读取 Cookies，可能包含登录状态。请仅下载你有权访问和使用的内容；如果读取失败，可先完全关闭 Firefox 后重试。", "使用 Firefox Cookies", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
-
-            try { Directory.CreateDirectory(folder); }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, "无法创建保存目录：" + ex.Message, "目录错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            bool subtitleMode = selectedMode == 2;
-            SubtitleSnapshot subtitleBefore = null;
-            try { if (subtitleMode) subtitleBefore = CaptureSubtitles(folder); }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, "无法检查字幕目录：" + ex.Message, "目录错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            lastFolder = folder;
-            progress.Value = 0;
-            logBox.Clear();
-            cancelling = false;
-            noSubtitles = false;
-            lastErrorMessage = null;
-            douyinCookieError = false;
-            bool usedFirefoxCookies = firefoxBox.Checked;
-            SetBusy(true);
-            status.Text = "正在分析链接…";
-            var args = BuildArguments(url, folder, appDir);
-            var worker = new Thread(() => RunDownload(ytDlp, args, appDir, folder, subtitleMode, subtitleBefore, usedFirefoxCookies));
-            worker.IsBackground = true;
-            worker.Start();
         }
 
         private static SubtitleSnapshot CaptureSubtitles(string folder)
@@ -499,25 +419,40 @@ namespace YtDlpGuiMvp
         private string BuildArguments(string url, string folder, string appDir)
         {
             var args = new StringBuilder();
-            args.Append("--ignore-config --newline --no-overwrites --no-post-overwrites --no-playlist ");
-            if (playlistBox.Checked) args.Replace("--no-playlist", "--yes-playlist");
-            args.Append("--ffmpeg-location ").Append(Quote(appDir)).Append(' ');
-            args.Append("-P ").Append(Quote(folder)).Append(' ');
-            if (firefoxBox.Checked) args.Append("--cookies-from-browser firefox ");
-            if (selectedMode == 0)
+
+            args.Append("--ignore-config --newline --no-overwrites --no-post-overwrites ");
+            args.Append(chkPlaylist.Checked ? "--yes-playlist ":"--no-playlist ").Append("--concurrent-fragment 12 ");
+            args.Append("--ffmpeg-location ").Append(Quote(appDir)).Append(" -P ").Append(Quote(folder)).Append(' ');
+
+            if (chkFirefox.Checked) args.Append("--cookies-from-browser firefox ");
+
+            switch (selectedMode)
             {
-                args.Append("-t mp4 ");
-                int preferredResolution = SelectedPreferredResolution();
-                if (preferredResolution > 0)
+                case 0:
                 {
-                    string resolution = preferredResolution.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    args.Append("-S ").Append(Quote("res:" + resolution)).Append(' ');
-                    args.Append("-o ").Append(Quote("%(title)s [%(id)s] [%(resolution)s].%(ext)s")).Append(' ');
+                    int preferredResolution = SelectedPreferredResolution();
+                    if (preferredResolution > 0)
+                    {
+                        string resolution = preferredResolution.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+                        args.Append("-t mp4 -S ").Append(Quote("res:" + resolution)).Append("-o ")
+                            .Append(Quote("%(title)s [%(id)s] [%(resolution)s].%(ext)s")).Append(' ').Append(Quote(url));
+                    }
+                    else args.Append("-t mp4 ").Append(Quote(url));
+
+                    break;
+                }
+                case 1: { args.Append("-t mp3 ").Append(Quote(url)); break; }
+                default:
+                {
+                    args.Append("--write-subs --write-auto-subs --sub-langs ")
+                        .Append(Quote(SelectedSubtitleLanguage()))
+                        .Append(" --convert-subs srt --skip-download ")
+                        .Append(Quote(url));
+                    break;
                 }
             }
-            else if (selectedMode == 1) args.Append("-t mp3 ");
-            else args.Append("--write-subs --write-auto-subs --sub-langs ").Append(Quote(SelectedSubtitleLanguage())).Append(" --convert-subs srt --skip-download ");
-            args.Append(Quote(url));
+
             return args.ToString();
         }
 
@@ -562,85 +497,86 @@ namespace YtDlpGuiMvp
             info.EnvironmentVariables["TMP"] = runtimeTemp;
         }
 
-        private void RunDownload(string ytDlp, string args, string appDir, string folder, bool subtitleMode, SubtitleSnapshot subtitleBefore, bool usedFirefoxCookies)
+        private void RunDownload(string ytDlp, string args, string appDir, string folder, bool subtitleMode,
+                                 SubtitleSnapshot subtitleBefore, bool usedFirefoxCookies)
         {
             try
             {
-                var info = new ProcessStartInfo(ytDlp, args);
-                info.WorkingDirectory = appDir;
-                info.UseShellExecute = false;
-                info.CreateNoWindow = true;
+                var info                    = new ProcessStartInfo(ytDlp, args);
+                info.WorkingDirectory       = appDir;
+                info.UseShellExecute        = false;
+                info.CreateNoWindow         = true;
                 info.RedirectStandardOutput = true;
-                info.RedirectStandardError = true;
+                info.RedirectStandardError  = true;
                 // The Windows yt-dlp executable uses the active ANSI code page for redirected pipes.
                 // On Chinese Windows this is GBK, not UTF-8.
                 info.StandardOutputEncoding = Encoding.Default;
-                info.StandardErrorEncoding = Encoding.Default;
+                info.StandardErrorEncoding  = Encoding.Default;
                 ConfigureProcessEnvironment(info, appDir);
                 using (var process = new Process())
                 {
-                    process.StartInfo = info;
+                    process.StartInfo           = info;
                     process.OutputDataReceived += (s, e) => HandleLine(e.Data);
-                    process.ErrorDataReceived += (s, e) => HandleLine(e.Data);
+                    process.ErrorDataReceived  += (s, e) => HandleLine(e.Data);
                     if (cancelling) throw new OperationCanceledException("已取消。");
-                    if (!process.Start()) throw new InvalidOperationException("yt-dlp 无法启动。");
-                    currentProcess = process;
+                    if (!process.Start()) throw new InvalidOperationException("yt-dlp 無法啓動。");
+                    currentProcess              = process;
                     if (cancelling) KillProcessTree(process);
                     process.BeginOutputReadLine();
                     process.BeginErrorReadLine();
                     process.WaitForExit();
-                    int code = process.ExitCode;
-                    currentProcess = null;
-                    int converted = 0;
-                    int conversionFailed = 0;
+                    int code                    = process.ExitCode;
+                    currentProcess              = null;
+                    int converted               = 0;
+                    int conversionFailed        = 0;
                     if (subtitleMode && !cancelling)
                     {
-                        PostUi(() => status.Text = "正在检查和转换字幕…");
+                        PostUi(() => lblStatus.Text = "正在檢查與轉換字幕…");
                         try { ConvertNewVttFiles(folder, subtitleBefore, Path.Combine(appDir, "ffmpeg.exe"), out converted, out conversionFailed); }
                         catch (Exception ex)
                         {
                             conversionFailed++;
-                            HandleLine("字幕转换检查失败：" + ex.Message);
+                            HandleLine("字幕轉換檢查失敗：" + ex.Message);
                         }
                     }
-                    int convertedCount = converted;
-                    int failedCount = conversionFailed;
+                    int convertedCount          = converted;
+                    int failedCount             = conversionFailed;
                     PostUi(() =>
                     {
                         SetBusy(false);
-                        if (cancelling) status.Text = "已取消；可能留下未完成的 .part 文件。";
+                        if (cancelling) lblStatus.Text = "已取消；可能留下未完成的 .part 文件。";
                         else if (code == 0 && subtitleMode && noSubtitles && convertedCount == 0)
-                            status.Text = "命令已完成，但视频没有所选语言的字幕。";
+                            lblStatus.Text = "命令已完成，但影片沒有所選語言的字幕。";
                         else if (code != 0 && convertedCount > 0)
-                            status.Text = "部分字幕请求失败，但已生成 " + convertedCount + " 个 SRT；请查看运行记录。";
+                            lblStatus.Text = "部分字幕請求失敗，但已生成 " + convertedCount + " 箇 SRT；請查看運行記録。";
                         else if (code == 0 && failedCount > 0)
-                            status.Text = "下载完成，但有 " + failedCount + " 个 VTT 未能转换为 SRT；请查看运行记录。";
+                            lblStatus.Text = "下載完成，但有 " + failedCount + " 箇 VTT 未能转换为 SRT；請查看運行記録。";
                         else if (code == 0)
                         {
                             progress.Value = 100;
-                            status.Text = subtitleMode && convertedCount > 0
-                                ? "完成！已生成 " + convertedCount + " 个 SRT 字幕。"
-                                : "完成！可点击“打开保存目录”。";
+                            lblStatus.Text = subtitleMode && convertedCount > 0
+                                ? "完成！已生成 " + convertedCount + " 箇 SRT 字幕。"
+                                : "完成！可點擊「打開保存目録」。";
                         }
                         else
                         {
-                            status.Text = lastErrorMessage ?? "下载失败；请查看下方运行记录。";
+                            lblStatus.Text = lastErrorMessage ?? "下載失敗；請查看下方運行記録。";
                             if (douyinCookieError)
                                 AppendLog(usedFirefoxCookies
-                                    ? "提示：已经使用 Firefox Cookies 但抖音仍返回空数据。这可能是站点接口限制；请确认 Firefox 中能播放该视频，并关注 yt-dlp 抖音站点问题。"
-                                    : "提示：先在 Firefox 中打开并刷新这条抖音视频，再勾选“读取 Firefox Cookies”重试。此方法也不保证站点接口一定可用。");
+                                    ? "提示：已經使用 Firefox Cookies 但抖音仍返回空數據。这可能是站點接口限制；請確認 Firefox 中能播放該影片，並關注 yt-dlp 抖音站點問題。"
+                                    : "提示：先在 Firefox 中打開並刷新該抖音影片，再勾選「讀取 Firefox Cookies」重試。此方法也不保證站點接口一定可用。");
                         }
-                        firefoxBox.Checked = false;
+                        chkFirefox.Checked = false;
                     });
                 }
             }
             catch (OperationCanceledException)
             {
-                PostUi(() => { SetBusy(false); status.Text = "已取消。"; firefoxBox.Checked = false; });
+                PostUi(() => { SetBusy(false); lblStatus.Text = "已取消。"; chkFirefox.Checked = false; });
             }
             catch (Exception ex)
             {
-                PostUi(() => { SetBusy(false); status.Text = "启动失败：" + ex.Message; AppendLog(ex.ToString()); firefoxBox.Checked = false; });
+                PostUi(() => { SetBusy(false); lblStatus.Text = "啓動失敗：" + ex.Message; AppendLog(ex.ToString()); chkFirefox.Checked = false; });
             }
             finally { currentProcess = null; }
         }
@@ -648,19 +584,19 @@ namespace YtDlpGuiMvp
         private void ConvertNewVttFiles(string folder, SubtitleSnapshot before, string ffmpeg, out int converted, out int failed)
         {
             converted = 0;
-            failed = 0;
+            failed    = 0;
             foreach (string vtt in Directory.GetFiles(folder, "*.vtt", SearchOption.TopDirectoryOnly))
             {
                 if (cancelling) break;
                 bool newVtt = !before.Vtt.Contains(vtt);
-                string srt = Path.ChangeExtension(vtt, ".srt");
+                string srt  = Path.ChangeExtension(vtt, ".srt");
                 if (File.Exists(srt))
                 {
                     if (newVtt && !before.Srt.Contains(srt) && new FileInfo(srt).Length > 0)
                     {
                         File.Delete(vtt);
                         converted++;
-                        HandleLine("字幕：SRT 已生成，清理本次下载的 VTT：" + Path.GetFileName(vtt));
+                        HandleLine("字幕：SRT 已生成，淸理本次下載的 VTT：" + Path.GetFileName(vtt));
                     }
                     else if (newVtt)
                     {
@@ -670,25 +606,25 @@ namespace YtDlpGuiMvp
                     continue;
                 }
 
-                var info = new ProcessStartInfo(ffmpeg, "-hide_banner -loglevel error -nostdin -n -i " + Quote(vtt) + " -f srt " + Quote(srt));
-                info.WorkingDirectory = folder;
-                info.UseShellExecute = false;
-                info.CreateNoWindow = true;
+                var info                    = new ProcessStartInfo(ffmpeg, "-hide_banner -loglevel error -nostdin -n -i " + Quote(vtt) + " -f srt " + Quote(srt));
+                info.WorkingDirectory       = folder;
+                info.UseShellExecute        = false;
+                info.CreateNoWindow         = true;
                 info.RedirectStandardOutput = true;
-                info.RedirectStandardError = true;
+                info.RedirectStandardError  = true;
                 info.StandardOutputEncoding = Encoding.Default;
-                info.StandardErrorEncoding = Encoding.Default;
+                info.StandardErrorEncoding  = Encoding.Default;
                 using (var process = new Process())
                 {
-                    process.StartInfo = info;
+                    process.StartInfo           = info;
                     process.OutputDataReceived += (s, e) => HandleLine(e.Data);
-                    process.ErrorDataReceived += (s, e) => HandleLine(e.Data);
+                    process.ErrorDataReceived  += (s, e) => HandleLine(e.Data);
                     if (!process.Start()) { failed++; continue; }
-                    currentProcess = process;
+                    currentProcess              = process;
                     process.BeginOutputReadLine();
                     process.BeginErrorReadLine();
                     process.WaitForExit();
-                    currentProcess = null;
+                    currentProcess              = null;
                     if (cancelling) break;
                     if (process.ExitCode == 0 && File.Exists(srt) && new FileInfo(srt).Length > 0)
                     {
@@ -700,7 +636,7 @@ namespace YtDlpGuiMvp
                     {
                         if (File.Exists(srt) && new FileInfo(srt).Length == 0) File.Delete(srt);
                         failed++;
-                        HandleLine("字幕：VTT 转 SRT 失败，原 VTT 已保留：" + Path.GetFileName(vtt));
+                        HandleLine("字幕：VTT 转 SRT 失敗，原 VTT 已保留：" + Path.GetFileName(vtt));
                     }
                 }
             }
@@ -720,13 +656,13 @@ namespace YtDlpGuiMvp
                     if (Double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value))
                     {
                         progress.Value = Math.Max(0, Math.Min(100, (int)Math.Round(value)));
-                        status.Text = "下载中 " + value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
+                        lblStatus.Text = "下載中 " + value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
                     }
                 }
                 else if (line.IndexOf("[Merger]", StringComparison.OrdinalIgnoreCase) >= 0 || line.IndexOf("[ExtractAudio]", StringComparison.OrdinalIgnoreCase) >= 0)
-                    status.Text = "下载完成，正在处理文件…";
+                    lblStatus.Text = "下載完成，正在處理文件…";
                 else if (line.StartsWith("ERROR:", StringComparison.OrdinalIgnoreCase))
-                    status.Text = lastErrorMessage = FriendlyError(line);
+                    lblStatus.Text = lastErrorMessage = FriendlyError(line);
             });
         }
 
@@ -735,23 +671,23 @@ namespace YtDlpGuiMvp
             if (isDouyinDownload && line.IndexOf("Fresh cookies", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 douyinCookieError = true;
-                return firefoxBox.Checked
-                    ? "抖音仍未返回视频数据；即使有新鲜 Cookies，站点接口也可能限制提取。"
-                    : "抖音要求新鲜 Cookies；请先在 Firefox 打开视频，再勾选读取。";
+                return chkFirefox.Checked
+                    ? "抖音仍未返回影片數據；即使有新鮮 Cookies，站點接口也可能限制提取。"
+                    : "抖音要求新鮮 Cookies；請先在 Firefox 打開影片，再勾選讀取。";
             }
-            if (line.IndexOf("not a bot", StringComparison.OrdinalIgnoreCase) >= 0) return "YouTube 要求登录确认：可勾选读取 Firefox Cookies。";
-            if (line.IndexOf("HTTP Error 429", StringComparison.OrdinalIgnoreCase) >= 0) return "字幕请求被限流（429）；请稍后重试，避免短时间连续下载。";
-            if (line.IndexOf("DPAPI", StringComparison.OrdinalIgnoreCase) >= 0) return "Chrome Cookies 解密失败；请使用 Firefox。";
-            if (line.IndexOf("private video", StringComparison.OrdinalIgnoreCase) >= 0) return "此视频需要访问权限；可勾选读取 Firefox Cookies。";
-            if (line.IndexOf("Could not copy Firefox cookie database", StringComparison.OrdinalIgnoreCase) >= 0) return "无法读取 Firefox 登录状态；请完全关闭 Firefox 后重试。";
-            return "下载遇到错误；请查看运行记录。";
+            if (line.IndexOf("not a bot", StringComparison.OrdinalIgnoreCase) >= 0) return "YouTube 要求登録確認：可勾選讀取 Firefox Cookies。";
+            if (line.IndexOf("HTTP Error 429", StringComparison.OrdinalIgnoreCase) >= 0) return "字幕請求被限流（429）；請稍後重試，避免短時間連續下載。";
+            if (line.IndexOf("DPAPI", StringComparison.OrdinalIgnoreCase) >= 0) return "Chrome Cookies 解密失敗；請使用 Firefox。";
+            if (line.IndexOf("private video", StringComparison.OrdinalIgnoreCase) >= 0) return "此影片需要訪問權限；可勾選讀取 Firefox Cookies。";
+            if (line.IndexOf("Could not copy Firefox cookie database", StringComparison.OrdinalIgnoreCase) >= 0) return "無法讀取 Firefox 登録状态；請完全關閉 Firefox 後重試。";
+            return "下載遇到錯誤；請查看運行記録。";
         }
 
         private void AppendLog(string line)
         {
-            if (logBox.IsDisposed) return;
-            logBox.AppendText(line + Environment.NewLine);
-            if (logBox.TextLength > 90000) logBox.Text = logBox.Text.Substring(logBox.TextLength - 60000);
+            if (txtLog.IsDisposed) return;
+            txtLog.AppendText(line + Environment.NewLine);
+            if (txtLog.TextLength > 90000) txtLog.Text = txtLog.Text.Substring(txtLog.TextLength - 60000);
         }
 
         private void PostUi(Action action)
@@ -760,7 +696,7 @@ namespace YtDlpGuiMvp
             {
                 ui.Post(_ =>
                 {
-                    if (IsDisposed || Disposing || logBox.IsDisposed) return;
+                    if (IsDisposed || Disposing || txtLog.IsDisposed) return;
                     action();
                 }, null);
             }
@@ -775,55 +711,51 @@ namespace YtDlpGuiMvp
 
         private void SetBusy(bool busy, bool allowCancel)
         {
-            downloadButton.Enabled = !busy;
-            cancelButton.Enabled = busy && allowCancel;
-            updateButton.Enabled = !busy;
-            browseButton.Enabled = !busy;
-            folderBox.Enabled = !busy;
-            urlBox.Enabled = !busy;
-            foreach (Button button in modeButtons) button.Enabled = !busy;
-            subtitleLanguageBox.Enabled = !busy && selectedMode == 2;
-            videoResolutionBox.Enabled = !busy && selectedMode == 0;
-            firefoxBox.Enabled = !busy;
-            playlistBox.Enabled = !busy;
+            foreach (Button btn in btnSelectMode)
+            {
+                btn.Enabled             = !busy;
+            }
+            btnDownload.Enabled         = !busy;
+            btnCancel.Enabled           = busy && allowCancel;
+            btnUpdateComponents.Enabled = !busy;
+            btnBrowse.Enabled           = !busy;
+
+            cmbSubtitleLanguage.Enabled = !busy && selectedMode == 2;
+            cmbVideoResolution.Enabled  = !busy && selectedMode == 0;
+            chkFirefox.Enabled          = !busy;
+            chkPlaylist.Enabled         = !busy;
+
+            txtSavePath.Enabled           = !busy;
+            txtUrl.Enabled              = !busy;
         }
 
         private void CheckComponentsOnStartup()
         {
-            string appDir = AppDomain.CurrentDomain.BaseDirectory;
-            string[] missing = ComponentInstaller.MissingComponents(appDir);
-            if (missing.Length == 0)
-            {
-                status.Text = "运行组件完整，可以开始下载。";
-                return;
-            }
-            status.Text = "首次使用需要安装 " + missing.Length + " 个运行组件。";
-            DialogResult choice = MessageBox.Show(this,
-                "这是轻量公开版。首次使用需要从各项目的官方服务器下载运行组件。\n\n缺少：\n" +
-                String.Join("\n", missing) +
-                "\n\n完整下载约 250 MB。程序会自动重试可信备用线路，并使用官方 SHA-256 校验文件。现在安装吗？",
-                "首次运行设置", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-            if (choice == DialogResult.Yes) StartComponentInstall();
-            else status.Text = "尚未安装完整组件；可点击“检查运行组件”继续。";
+            string[] missing    = ComponentInstaller.MissingComponents(AppDomain.CurrentDomain.BaseDirectory, true);
+            if (0 == missing.Length) { lblStatus.Text = "運行組件完整，可以開始下載。"; return; }
+
+            lblStatus.Text      = "首次使用需要安裝 " + missing.Length + " 箇運行組件。";
+            if (DialogResult.Yes == MBOX_I("這是輕量公開版。首次使用需要從各項目的官方伺服器下載運行組件。\n\n缺少：\n" +
+                                         String.Join("\n", missing) + "\n\n完整下載约 250 MB。" +
+                                         "程式會自動重試可信備用綫路，並使用官方 SHA-256 校驗文件。現在安裝吗？",
+                                         "首次運行設置")) StartComponentInstall();
+            else lblStatus.Text = "尚未安裝完整組件；可點击「檢查運行組件」繼續。";
         }
 
         private void StartComponentInstall()
         {
-            string appDir = AppDomain.CurrentDomain.BaseDirectory;
-            string[] missing = ComponentInstaller.MissingComponents(appDir);
-            if (missing.Length == 0)
-            {
-                status.Text = "四个运行组件均已安装。";
-                return;
-            }
-            logBox.Clear();
-            progress.Value = 0;
-            cancelling = false;
-            AppendLog("将安装：" + String.Join("、", missing));
-            AppendLog("只使用项目官方或官方上游线路；每个文件安装前都会核对官方 SHA-256。");
-            status.Text = "正在准备安装运行组件…";
+            string appDir       = AppDomain.CurrentDomain.BaseDirectory;
+            string[] missing    = ComponentInstaller.MissingComponents(appDir, true);
+            if (0 == missing.Length) { lblStatus.Text = "四箇運行組件均已安裝。"; return; }
+
+            txtLog.Clear();
+            progress.Value      = 0;
+            cancelling          = false;
+            AppendLog("將安裝：" + String.Join("、", missing));
+            AppendLog("只使用項目官方或官方上游綫路；每箇文件安裝前都會校核官方 SHA-256。");
+            lblStatus.Text      = "正在准備安裝運行組件…";
             SetBusy(true, false);
-            var worker = new Thread(() => RunComponentInstall(appDir));
+            var worker          = new Thread(() => RunComponentInstall(appDir));
             worker.IsBackground = true;
             worker.Start();
         }
@@ -833,23 +765,23 @@ namespace YtDlpGuiMvp
             try
             {
                 ComponentInstaller.InstallMissing(appDir,
-                    (value, message) => PostUi(() =>
-                    {
-                        progress.Value = Math.Max(0, Math.Min(100, value));
-                        status.Text = message;
-                    }),
-                    message => PostUi(() => AppendLog(message)));
-                string[] remaining = ComponentInstaller.MissingComponents(appDir);
+                                                  (value, message) => PostUi(() =>
+                                                  {
+                                                      progress.Value  = Math.Max(0, Math.Min(100, value));
+                                                      lblStatus.Text  = message;
+                                                  }),
+                                                  message => PostUi(() => AppendLog(message)));
+                string[] remaining = ComponentInstaller.MissingComponents(appDir, true);
                 PostUi(() =>
                 {
                     SetBusy(false);
                     if (remaining.Length == 0)
                     {
-                        progress.Value = 100;
-                        status.Text = "运行组件安装完成，可以开始下载。";
-                        AppendLog("组件安装完成：yt-dlp、FFmpeg、FFprobe、Deno 均已就绪。");
+                        progress.Value  = 100;
+                        lblStatus.Text     = "運行組件安裝完成，可以開始下載。";
+                        AppendLog("組件安裝完成：yt-dlp、FFmpeg、FFprobe、Deno 均已就緒。");
                     }
-                    else status.Text = "仍缺少组件：" + String.Join("、", remaining);
+                    else lblStatus.Text = "仍缺少組件：" + String.Join("、", remaining);
                 });
             }
             catch (Exception ex)
@@ -857,39 +789,37 @@ namespace YtDlpGuiMvp
                 PostUi(() =>
                 {
                     SetBusy(false);
-                    status.Text = "组件安装失败；已保留成功安装的组件，请查看运行记录后重试。";
-                    AppendLog("安装失败：" + ComponentInstaller.FriendlyNetworkMessage(ex));
+                    lblStatus.Text = "組件安裝失敗；已保留成功安裝的組件，請查看運行記録後重試。";
+                    AppendLog("安裝失敗：" + ComponentInstaller.FriendlyNetworkMessage(ex));
                 });
             }
         }
 
-        private void UpdateClicked(object sender, EventArgs e)
+        private void btnUpdateComponents_EventHandler_Click(object sender, EventArgs e)
         {
-            string appDir = AppDomain.CurrentDomain.BaseDirectory;
-            string[] missing = ComponentInstaller.MissingComponents(appDir);
-            if (missing.Length > 0)
+            string appDir    = AppDomain.CurrentDomain.BaseDirectory;
+            string[] missing = ComponentInstaller.MissingComponents(appDir, true);
+            if ((missing.Length > 0) &&
+                (DialogResult.Yes == MBOX_I("當前缺少：\n\n" + String.Join("\n", missing) +
+                                            "\n\n是否從官方綫路下載並安裝？", "運行組件不完整")))
             {
-                DialogResult install = MessageBox.Show(this,
-                    "当前缺少：\n\n" + String.Join("\n", missing) +
-                    "\n\n是否从官方线路下载并安装？",
-                    "运行组件不完整", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-                if (install == DialogResult.Yes) StartComponentInstall();
+                StartComponentInstall();
                 return;
             }
             string ytDlp = Path.Combine(appDir, "yt-dlp.exe");
-            if (MessageBox.Show(this,
-                "检查完成：yt-dlp、FFmpeg、FFprobe 和 Deno 均已安装。\n\n是否继续使用 yt-dlp 官方自更新功能检查下载核心的新版本？本界面、FFmpeg 和 Deno 不会因此更新。",
-                "运行组件完整", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes)
+            if (DialogResult.Yes != MBOX_I("檢查完成：yt-dlp、FFmpeg、FFprobe 和 Deno 均已安裝。\n\n" +
+                                           "是否繼續使用 yt-dlp 官方自更新功能檢查下載核心的新版本？\n\n\n\n" +
+                                           "（本界面、FFmpeg、Deno不會因此更新。）", "運行組件完整"))
             {
-                status.Text = "运行组件完整。";
+                lblStatus.Text = "運行組件完整。";
                 return;
             }
 
-            logBox.Clear();
-            progress.Value = 0;
-            status.Text = "正在检查 yt-dlp 更新…";
+            txtLog.Clear();
+            progress.Value      = 0;
+            lblStatus.Text      = "正在檢查 yt-dlp 更新…";
             SetBusy(true, false);
-            var worker = new Thread(() => RunCoreUpdate(ytDlp, appDir));
+            var worker          = new Thread(() => RunCoreUpdate(ytDlp, appDir));
             worker.IsBackground = true;
             worker.Start();
         }
@@ -898,80 +828,225 @@ namespace YtDlpGuiMvp
         {
             try
             {
-                var info = new ProcessStartInfo(ytDlp, "--ignore-config -U");
-                info.WorkingDirectory = appDir;
-                info.UseShellExecute = false;
-                info.CreateNoWindow = true;
-                info.RedirectStandardOutput = true;
-                info.RedirectStandardError = true;
-                info.StandardOutputEncoding = Encoding.Default;
-                info.StandardErrorEncoding = Encoding.Default;
+                var info                        = new ProcessStartInfo(ytDlp, "--ignore-config -U");
+                info.WorkingDirectory           = appDir;
+                info.UseShellExecute            = false;
+                info.CreateNoWindow             = true;
+                info.RedirectStandardOutput     = true;
+                info.RedirectStandardError      = true;
+                info.StandardOutputEncoding     = Encoding.Default;
+                info.StandardErrorEncoding      = Encoding.Default;
                 ConfigureProcessEnvironment(info, appDir);
                 using (var process = new Process())
                 {
-                    process.StartInfo = info;
+                    process.StartInfo           = info;
                     process.OutputDataReceived += (s, e) => HandleUpdateLine(e.Data);
-                    process.ErrorDataReceived += (s, e) => HandleUpdateLine(e.Data);
-                    if (!process.Start()) throw new InvalidOperationException("yt-dlp 更新程序无法启动。");
+                    process.ErrorDataReceived  += (s, e) => HandleUpdateLine(e.Data);
+                    if (!process.Start()) throw new InvalidOperationException("yt-dlp 更新程序無法啓動。");
                     process.BeginOutputReadLine();
                     process.BeginErrorReadLine();
                     process.WaitForExit();
-                    int code = process.ExitCode;
+                    int code                    = process.ExitCode;
                     PostUi(() =>
                     {
                         SetBusy(false);
-                        status.Text = code == 0
-                            ? "更新检查完成；下次下载会使用当前目录中的 yt-dlp 核心。"
-                            : "更新失败；请查看运行记录，确认网络和目录写入权限。";
+                        lblStatus.Text          = code == 0
+                            ? "更新檢查完成；下次下載會使用當前目録中的 yt-dlp 核心。"
+                            : "更新失敗；請查看運行記録，確認网络和目録写入權限。";
                     });
                 }
             }
             catch (Exception ex)
             {
-                PostUi(() => { SetBusy(false); status.Text = "更新失败：" + ex.Message; AppendLog(ex.ToString()); });
+                PostUi(() => { SetBusy(false); lblStatus.Text = "更新失敗：" + ex.Message; AppendLog(ex.ToString()); });
             }
         }
 
         private void HandleUpdateLine(string line)
         {
             if (String.IsNullOrEmpty(line)) return;
-            PostUi(() => { AppendLog(line); status.Text = "正在检查或下载 yt-dlp 更新…"; });
-        }
-
-        private void CancelClicked(object sender, EventArgs e)
-        {
-            cancelling = true;
-            cancelButton.Enabled = false;
-            status.Text = "正在取消…";
-            try { KillProcessTree(currentProcess); }
-            catch (Exception ex) { AppendLog("取消失败：" + ex.Message); }
+            PostUi(() => { AppendLog(line); lblStatus.Text = "正在檢查或下載 yt-dlp 更新…"; });
         }
 
         private static void KillProcessTree(Process process)
         {
             if (process == null || process.HasExited) return;
-            var info = new ProcessStartInfo("taskkill.exe", "/PID " + process.Id + " /T /F");
-            info.UseShellExecute = false;
-            info.CreateNoWindow = true;
+            var info                = new ProcessStartInfo("taskkill.exe", "/PID " + process.Id + " /T /F");
+            info.UseShellExecute    = false;
+            info.CreateNoWindow     = true;
             using (var killer = Process.Start(info))
             {
-                if (killer == null) throw new InvalidOperationException("无法启动 taskkill。");
+                if (killer == null) throw new InvalidOperationException("無法啓動 taskkill。");
                 killer.WaitForExit(5000);
             }
         }
 
-        private void OpenClicked(object sender, EventArgs e)
+    #region Event Handler
+        private void btnBrowse_EventHandler_Click(object sender, EventArgs e)
+        {
+            using (var dialog = new FolderBrowserDialog())
+            {
+                dialog.Description = "選擇下載文件保存目録";
+                if (Directory.Exists(txtSavePath.Text)) dialog.SelectedPath = txtSavePath.Text;
+                if (DialogResult.OK == dialog.ShowDialog(this)) txtSavePath.Text = dialog.SelectedPath;
+            }
+        }
+
+        private void btnCancel_EventHandler_Click(object sender, EventArgs e)
+        {
+            cancelling           = true;
+            btnCancel.Enabled    = false;
+            lblStatus.Text       = "正在取消…";
+            try { KillProcessTree(currentProcess); }
+            catch (Exception ex) { AppendLog("取消失敗：" + ex.Message); }
+        }
+
+        private void btnDownload_EventHandler_Click(object sender, EventArgs e)
+        {
+            string url = ExtractPreferredUrl(txtUrl.Text);
+            if (!Uri.IsWellFormedUriString(url, UriKind.Absolute) ||
+                !(url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            {
+                MBOX_W("沒有識別到有效的視頻網址。可以直接貼上抖音等平臺的整段分享文字。", "鏈接無效");
+                return;
+            }
+
+            string rootFolder = txtSavePath.Text.Trim();
+            if (0 == rootFolder.Length || !Path.IsPathRooted(rootFolder))
+            {
+                MBOX_W("請選擇完整的保存根目録。", "缺少目録");
+                return;
+            }
+            string folder;
+            try { folder = Path.Combine(rootFolder, ModeSubfolder(selectedMode)); }
+            catch (ArgumentException)
+            {
+                MBOX_W("保存目録名無效。", "目録錯誤");
+                return;
+            }
+
+            string appDir       = AppDomain.CurrentDomain.BaseDirectory;
+            string ytDlp        = Path.Combine(appDir, "yt-dlp.exe");
+            string[] missing    = ComponentInstaller.MissingComponents(appDir, true);
+            if ((missing.Length > 0) &&
+                (DialogResult.Yes ==  MBOX_E("程式目録缺少以下組件：\n\n" + String.Join("\n", missing) +
+                                             "\n\n是否現在從各項目的官方 GitHub 下載並校驗？也可以取消後手動放入程式目録。",
+                                             "需要安裝運行組件", MessageBoxButtons.YesNo)))
+            {
+                StartComponentInstall();
+                return;
+            }
+
+            isDouyinDownload = IsDouyinUrl(url);
+            bool cookiesConfirmed = false;
+            if (isDouyinDownload && !chkFirefox.Checked)
+            {
+                var choice = MBOX_I("抖音經常要求新鮮 Cookies（不一定需要登録）。請先在 Firefox 中打開該抖音鏈接並刷新頁面。\n\n" +
+                                    "現在從 Firefox 讀取 Cookies 嗎？選擇「否」會繼續嘗試無 Cookies 下載，但可能失敗。",
+                                    "抖音訪問提示", MessageBoxButtons.YesNoCancel);
+                if (choice == DialogResult.Cancel) return;
+                if (choice == DialogResult.Yes) { chkFirefox.Checked = true; cookiesConfirmed = true; }
+            }
+            if (chkPlaylist.Checked && DialogResult.OK != MBOX_Q("你選擇了下載整箇播放列表。請確認鏈接中的播放列表數量不會過大。", "確認批量下載")) return;
+            if (chkFirefox.Checked  && !cookiesConfirmed &&
+                DialogResult.OK != MBOX_I("將從 Firefox 讀取 Cookies，可能包含登録状态。" +
+                                          "請僅下載你有權訪問和使用的内容；如果讀取失敗，可先完全關閉 Firefox 後重試。",
+                                          "使用 Firefox Cookies", MessageBoxButtons.OKCancel)) return;
+
+            try { Directory.CreateDirectory(folder); }
+            catch (Exception ex)
+            {
+                 MBOX_E("無法創建保存目録：" + ex.Message, "目録錯誤");
+                return;
+            }
+
+            bool subtitleMode = selectedMode == 2;
+            SubtitleSnapshot subtitleBefore = null;
+            try { if (subtitleMode) subtitleBefore = CaptureSubtitles(folder); }
+            catch (Exception ex)
+            {
+                 MBOX_E("無法檢查字幕目録：" + ex.Message, "目録錯誤");
+                return;
+            }
+
+            lastFolder              = folder;
+            progress.Value          = 0;
+            txtLog.Clear();
+            cancelling              = false;
+            noSubtitles             = false;
+            lastErrorMessage        = null;
+            douyinCookieError       = false;
+            bool usedFirefoxCookies = chkFirefox.Checked;
+            SetBusy(true);
+            lblStatus.Text          = "正在分析鏈接……";
+            var args                = BuildArguments(url, folder, appDir);
+            var worker              = new Thread(() => RunDownload(ytDlp, args, appDir, folder, subtitleMode, subtitleBefore, usedFirefoxCookies));
+            worker.IsBackground     = true;
+            worker.Start();
+        }
+
+        private void btnOpenDownloadFolder_EventHandler_Click(object sender, EventArgs e)
         {
             try
             {
-                string folder = lastFolder ?? Path.Combine(folderBox.Text.Trim(), ModeSubfolder(selectedMode));
+                string folder = lastFolder ?? Path.Combine(txtSavePath.Text.Trim(), ModeSubfolder(selectedMode));
                 if (Directory.Exists(folder)) Process.Start("explorer.exe", Quote(folder));
-                else MessageBox.Show(this, "保存目录尚不存在。", "无法打开", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                else  MBOX_E("保存目録尚不存在。", "無法打開");
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "无法打开目录：" + ex.Message, "目录错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                 MBOX_E("無法打開目録：" + ex.Message, "目録錯誤");
             }
         }
+
+        private void btnSelectMode_EventHandler_Click_SelectMode(int mode)
+        {
+            selectedMode = mode;
+            for (int i = 0; i < btnSelectMode.Length; i++)
+            {
+                bool selected = i == mode;
+                btnSelectMode[i].BackColor                  = selected ? Color.FromArgb(32, 103, 201) : Color.FromArgb(239, 244, 251);
+                btnSelectMode[i].ForeColor                  = selected ? Color.White                  : Color.FromArgb(36, 53, 77);
+                btnSelectMode[i].FlatAppearance.BorderColor = selected ? Color.FromArgb(21, 82, 173)  : Color.FromArgb(195, 208, 225);
+            }
+            cmbSubtitleLanguage.Enabled = mode == 2 && btnDownload.Enabled;
+            cmbVideoResolution.Enabled  = mode == 0 && btnDownload.Enabled;
+            txtSavePath_EventHandler_TextChanged_UpdateFolderPreview();
+        }
+
+        private void txtSavePath_EventHandler_TextChanged_UpdateFolderPreview()
+        {
+            string rootFolder = txtSavePath.Text.Trim();
+            if (0 == rootFolder.Length) { lblSavePreview.Text = "本次保存到：請選擇根目録"; return; }
+            try { lblSavePreview.Text = "本次保存到：" + Path.Combine(rootFolder, ModeSubfolder(selectedMode)); }
+            catch (ArgumentException) { lblSavePreview.Text = "本次保存到：目録名無效"; }
+        }
+
+        private void txtUrl_EventHandler_TextChanged_UpdatePreview()
+        {
+            string extracted        = ExtractPreferredUrl(txtUrl.Text);
+            lblUrlPreview.Text      = "識別到的網址：" + (extracted == null ? "尚未找到" : extracted);
+            lblUrlPreview.ForeColor = extracted == null ? Color.FromArgb(129, 139, 154) : Color.FromArgb(29, 111, 131);
+        }
+    #endregion /* Event Handler */
+
+    #region MESSAGE BOX
+        private DialogResult MBOX_Q(string __MESSAGE__, string __CAPTION__ = null, MessageBoxButtons __BUTTON__ = MessageBoxButtons.OKCancel)
+        {
+            return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, MessageBoxIcon.Question);
+        }
+        private DialogResult MBOX_E(string __MESSAGE__, string __CAPTION__ = null, MessageBoxButtons __BUTTON__ = MessageBoxButtons.OK)
+        {
+            return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, MessageBoxIcon.Error);
+        }
+        private DialogResult MBOX_I(string __MESSAGE__, string __CAPTION__ = null, MessageBoxButtons __BUTTON__ = MessageBoxButtons.YesNo)
+        {
+            return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, MessageBoxIcon.Information);
+        }
+        private DialogResult MBOX_W(string __MESSAGE__, string __CAPTION__ = null, MessageBoxButtons __BUTTON__ = MessageBoxButtons.OK)
+        {
+            return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, MessageBoxIcon.Warning);
+        }
+    #endregion /* MESSAGE BOX */
     }
 }
