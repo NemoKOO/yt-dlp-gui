@@ -9,12 +9,12 @@ $testExe                = Join-Path $projectDir 'argument-tests.exe'
 
 cls
 if (-not (Test-Path -LiteralPath $compiler)) { throw 'The .NET Framework C# compiler was not found.' }
+if (      Test-Path -LiteralPath $gui      ) { del $gui     }
+if (      Test-Path -LiteralPath $testExe  ) { del $testExe }
 
-del $gui
 & $compiler /nologo /target:winexe /optimize                       "/out:$gui"     /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll $source $components
 if ($LASTEXITCODE -ne 0) { throw 'GUI compilation failed.' }
 
-del $testExe
 & $compiler /nologo /target:exe    /main:YtDlpGuiMvp.ArgumentTests "/out:$testExe" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll $source $components $tests
 if ($LASTEXITCODE -ne 0) { throw 'Argument-test compilation failed.' }
 
@@ -22,4 +22,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Argument-test compilation failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Argument tests failed.' }
 
 Write-Host "Build complete: $gui"
-::& $gui
+& $gui

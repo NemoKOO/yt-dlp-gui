@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Resources;
@@ -27,7 +28,7 @@ using System.Windows.Forms;
 // 程序集的版本信息
 [assembly: AssemblyFileVersion("0.6.1")]
 [assembly: AssemblyInformationalVersion("Release")]
-[assembly: AssemblyVersion("0.6.*")]
+[assembly: AssemblyVersion("0.6.1.*")]
 #endregion /* Assembly Information */
 
 namespace YtDlpGuiMvp
@@ -42,7 +43,10 @@ namespace YtDlpGuiMvp
             Version windows = Environment.OSVersion.Version;
             if (IsWindows7OrOlder(Environment.OSVersion.Platform, windows))
             {
-                 MessageBox.Show("此公開版使用的 yt-dlp 官方程式已不支援 Windows 7，因此無法透過安裝或複製 python310.dll 來修復。\n\n請在 Windows 10/11 x64 上使用。若必須繼續使用 Windows 7，需要自行維護和測試專用的舊版元件組合；本程式不會在 Win7 上自動下載不相容的元件。",
+                 MessageBox.Show("此公開版使用的 yt-dlp 官方程式已不支援 Windows 7，" +
+                                 "因此無法透過安裝或複製 python310.dll 來修復。\n\n" +
+                                 "請在 Windows 10/11 x64 上使用。若必須繼續使用 Windows 7，" +
+                                 "需要自行維護和測試專用的舊版元件組合；本程式不會在 Win7 上自動下載不相容的元件。",
                                  "Windows 7 不受支援", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -82,7 +86,7 @@ namespace YtDlpGuiMvp
         private                  int                    selectedMode;
         private                  string                 lastErrorMessage;
         private                  string                 lastFolder;
-
+// [download] X% of Size at Speed ETA Time
         private         readonly Regex                  percentPattern          = new Regex(@"\[download\]\s+(\d+(?:\.\d+)?)%", RegexOptions.Compiled);
         private static  readonly Regex                  urlPattern              = new Regex("https?://[^\\s<>\\[\\]\\(\\)（）“”\\\"'，。；！？、]+",
                                                                                             RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -94,8 +98,11 @@ namespace YtDlpGuiMvp
         private         readonly Button                 btnOpenDownloadFolder   = new Button();
         private         readonly Button                 btnUpdateComponents     = new Button();
         private         readonly Button[]               btnSelectMode           = { new Button(), new Button(), new Button() };
+        private         readonly CheckBox               chkDownloader           = new CheckBox();
         private         readonly CheckBox               chkFirefox              = new CheckBox();
         private         readonly CheckBox               chkPlaylist             = new CheckBox();
+        private         readonly ComboBox               cmbMaxConnections       = new ComboBox();
+        private         readonly ComboBox               cmbSplitChunkSize       = new ComboBox();
         private         readonly ComboBox               cmbSubtitleLanguage     = new ComboBox();
         private         readonly ComboBox               cmbVideoResolution      = new ComboBox();
         private         readonly Label                  lblStatus               = new Label();
@@ -224,7 +231,7 @@ namespace YtDlpGuiMvp
             cmbSubtitleLanguage.FlatStyle                   = FlatStyle.Standard;
             cmbSubtitleLanguage.Items.AddRange(new object[] { "簡體中文", "正體中文", "英文" });
             cmbSubtitleLanguage.Margin                      = new Padding(0, 5, 0, 0);
-            cmbSubtitleLanguage.SelectedIndex               = 0;
+            cmbSubtitleLanguage.SelectedIndex               = 1;
             cmbSubtitleLanguage.Width                       = 133;
             optionRow.Controls.Add(cmbSubtitleLanguage);
             root.Controls.Add(optionRow, 0, 5);
@@ -268,7 +275,7 @@ namespace YtDlpGuiMvp
             txtSavePath.BorderStyle                         = BorderStyle.FixedSingle;
             txtSavePath.Dock                                = DockStyle.Fill;
             txtSavePath.Font                                = new Font("Microsoft YaHei UI", 10.5F);
-            txtSavePath.Text                                = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop), "yt-dlp");
+            txtSavePath.Text                                = Path.Combine(GetDownloadsPath() ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "yt-dlp");
             txtSavePath.TextChanged                        += (s, e) => txtSavePath_EventHandler_TextChanged_UpdateFolderPreview();
             folderRow.Controls.Add(txtSavePath, 0, 0);
             btnBrowse.Dock                                  = DockStyle.Fill;
@@ -285,17 +292,57 @@ namespace YtDlpGuiMvp
             root.Controls.Add(lblSavePreview, 0, 9);
 
             var checkRow                                    = new FlowLayoutPanel();
+            chkDownloader.AutoSize                          = true;
+            chkDownloader.Text                              = "使用aria2c下載：";
+            chkDownloader.Margin                            = new Padding(0, 10, 0, 0);
+            chkDownloader.CheckedChanged                   += (s, e) => chkDownloader_EventHandler_CheckedChanged();
+
             chkFirefox.AutoSize                             = true;
             checkRow.Dock                                   = DockStyle.Fill;
             checkRow.FlowDirection                          = FlowDirection.LeftToRight;
-            chkFirefox.Margin                               = new Padding(0, 10, 24, 0);
+            chkFirefox.Margin                               = new Padding(0, 10, 6, 0);
             chkFirefox.Text                                 = "讀取 Firefox Cookies（需要驗證時）";
 
             chkPlaylist.AutoSize                            = true;
             chkPlaylist.Text                                = "下載播放列表";
-            chkPlaylist.Margin                              = new Padding(0, 10, 0, 0);
+            chkPlaylist.Margin                              = new Padding(0, 10, 16, 0);
+
+            cmbSplitChunkSize.Dock                          = DockStyle.Fill;
+            cmbSplitChunkSize.DropDownStyle                 = ComboBoxStyle.DropDownList;
+            cmbSplitChunkSize.FlatStyle                     = FlatStyle.Standard;
+            cmbSplitChunkSize.Items.AddRange(new object[] { "   1M", "   2M", "   4M", "   8M", "  16M", "  32M",
+                                                            "  64M", " 128M", " 256M", " 512M", "1024M" });
+            cmbSplitChunkSize.Margin                        = new Padding(0, 10, 12, 0);
+            cmbSplitChunkSize.SelectedIndex                 = 0;
+            cmbSplitChunkSize.Width                         = 70;
+
+            cmbMaxConnections.Dock                          = DockStyle.Fill;
+            cmbMaxConnections.DropDownStyle                 = ComboBoxStyle.DropDownList;
+            cmbMaxConnections.FlatStyle                     = FlatStyle.Standard;
+            cmbMaxConnections.Items.AddRange(new object[] { " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8", 
+                                                            " 9", "10", "11", "12", "13", "14", "15", "16" });
+            cmbMaxConnections.Margin                        = new Padding(0, 10, 12, 0);
+            cmbMaxConnections.SelectedIndex                 = 15;
+            cmbMaxConnections.Width                         = 40;
+
+            var maxConnectionsLabel                         = MakeLabel("最大連接數");
+            maxConnectionsLabel.Dock                        = DockStyle.Fill;
+            maxConnectionsLabel.Margin                      = new Padding(0, 10, 8, 0);
+            maxConnectionsLabel.Size                        = new Size(80, 38);
+
+            var chunkSizeLabel                              = MakeLabel("分塊字節");
+            chunkSizeLabel.Dock                             = DockStyle.Fill;
+            chunkSizeLabel.Margin                           = new Padding(0, 10, 8, 0);
+            chunkSizeLabel.Size                             = new Size(70, 38);
+
             checkRow.Controls.Add(chkFirefox);
             checkRow.Controls.Add(chkPlaylist);
+            checkRow.Controls.Add(chkDownloader);
+            checkRow.Controls.Add(maxConnectionsLabel);
+            checkRow.Controls.Add(cmbMaxConnections);
+            checkRow.Controls.Add(chunkSizeLabel);
+            checkRow.Controls.Add(cmbSplitChunkSize);
+            chkDownloader_EventHandler_CheckedChanged();
             root.Controls.Add(checkRow, 0, 10);
             ttpTips.SetToolTip(chkFirefox, "先用 Firefox 打開影片目標網址並刷新頁面，再勾選。Cookies 可能包含登録狀態。");
 
@@ -367,13 +414,14 @@ namespace YtDlpGuiMvp
         private Label MakeLabel(string value)
         {
             var label                       = new Label();
-            label.ForeColor                 = Color.FromArgb(76, 92, 112);
             label.Dock                      = DockStyle.Fill;
+            label.ForeColor                 = Color.FromArgb(76, 92, 112);
             label.Text                      = value;
             label.TextAlign                 = ContentAlignment.MiddleLeft;
 
             return label;
         }
+
 
         private static string ExtractPreferredUrl(string input)
         {
@@ -391,28 +439,30 @@ namespace YtDlpGuiMvp
 
         private string SelectedSubtitleLanguage()
         {
-            return (1 == cmbSubtitleLanguage.SelectedIndex) ? "^zh-Hant$" : ((2 == cmbSubtitleLanguage.SelectedIndex) ? "^en$" :  "^zh-Hans$");
+            return (1 == cmbSubtitleLanguage.SelectedIndex)
+                   ? "^zh-Hant$"
+                   : ((2 == cmbSubtitleLanguage.SelectedIndex) ? "^en$" :  "^zh-Hans$");
         }
 
         private int SelectedPreferredResolution()
         {
             switch (cmbVideoResolution.SelectedIndex)
             {
-                case 1: return 360;
-                case 2: return 480;
-                case 3: return 720;
-                case 4: return 1080;
-                case 5: return 1440;
-                case 6: return 2160;
-                default: return 0;
+                case 1 : return  360;
+                case 2 : return  480;
+                case 3 : return  720;
+                case 4 : return 1080;
+                case 5 : return 1440;
+                case 6 : return 2160;
+                default: return    0;
             }
         }
 
         private static SubtitleSnapshot CaptureSubtitles(string folder)
         {
             var result = new SubtitleSnapshot();
-            foreach (string path in Directory.GetFiles(folder, "*.vtt", SearchOption.TopDirectoryOnly)) result.Vtt.Add(path);
-            foreach (string path in Directory.GetFiles(folder, "*.srt", SearchOption.TopDirectoryOnly)) result.Srt.Add(path);
+            foreach (var path in Directory.GetFiles(folder, "*.vtt", SearchOption.TopDirectoryOnly)) result.Vtt.Add(path);
+            foreach (var path in Directory.GetFiles(folder, "*.srt", SearchOption.TopDirectoryOnly)) result.Srt.Add(path);
             return result;
         }
 
@@ -421,7 +471,23 @@ namespace YtDlpGuiMvp
             var args = new StringBuilder();
 
             args.Append("--ignore-config --newline --no-overwrites --no-post-overwrites ");
-            args.Append(chkPlaylist.Checked ? "--yes-playlist ":"--no-playlist ").Append("--concurrent-fragment 12 ");
+            args.Append(chkPlaylist.Checked ? "--yes-playlist ":"--no-playlist ");
+
+            if (chkDownloader.Checked && 
+                cmbMaxConnections.SelectedIndex < cmbMaxConnections.Items.Count && 
+                cmbSplitChunkSize.SelectedIndex < cmbSplitChunkSize.Items.Count) 
+            {
+                string conns = cmbMaxConnections.Items[cmbMaxConnections.SelectedIndex].ToString();
+                string chunk = cmbSplitChunkSize.Items[cmbSplitChunkSize.SelectedIndex].ToString();
+              // https://aria2.github.io/manual/en/html/aria2c.html#options
+              //args.Append("--downloader aria2c --downloader-args ").Append(Quote("aria2c:-x 32 -k 1M"));
+                args.Append("--downloader aria2c --downloader-args ").Append(Quote("aria2c:-x "+ conns + " -k " + chunk)).Append(' ');
+            }
+            else
+            {
+                args.Append("--concurrent-fragment 32 ");
+            }
+
             args.Append("--ffmpeg-location ").Append(Quote(appDir)).Append(" -P ").Append(Quote(folder)).Append(' ');
 
             if (chkFirefox.Checked) args.Append("--cookies-from-browser firefox ");
@@ -435,10 +501,13 @@ namespace YtDlpGuiMvp
                     {
                         string resolution = preferredResolution.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-                        args.Append("-t mp4 -S ").Append(Quote("res:" + resolution)).Append("-o ")
-                            .Append(Quote("%(title)s [%(id)s] [%(resolution)s].%(ext)s")).Append(' ').Append(Quote(url));
+                        args.Append("-t mp4 -S ").Append(Quote("res:" + resolution))
+                            .Append("-o ").Append(Quote("%(uploader)s_%(title)s [%(id)s] [%(resolution)s].%(ext)s"))
+                            .Append(' ').Append(Quote(url));
                     }
-                    else args.Append("-t mp4 ").Append(Quote(url));
+                    // DEFAULT OUTPUT TEMPLATE: %(title)s [%(id)s].%(ext)s
+                    else args.Append("-t mp4 -o ").Append(Quote("%(uploader)s_%(title)s_%(resolution)s.%(ext)s"))
+                             .Append(' ').Append(Quote(url));
 
                     break;
                 }
@@ -494,7 +563,7 @@ namespace YtDlpGuiMvp
             Directory.CreateDirectory(runtimeTemp);
             info.EnvironmentVariables["PATH"] = appDir + ";" + info.EnvironmentVariables["PATH"];
             info.EnvironmentVariables["TEMP"] = runtimeTemp;
-            info.EnvironmentVariables["TMP"] = runtimeTemp;
+            info.EnvironmentVariables["TMP" ] = runtimeTemp;
         }
 
         private void RunDownload(string ytDlp, string args, string appDir, string folder, bool subtitleMode,
@@ -513,6 +582,7 @@ namespace YtDlpGuiMvp
                 info.StandardOutputEncoding = Encoding.Default;
                 info.StandardErrorEncoding  = Encoding.Default;
                 ConfigureProcessEnvironment(info, appDir);
+
                 using (var process = new Process())
                 {
                     process.StartInfo           = info;
@@ -659,7 +729,8 @@ namespace YtDlpGuiMvp
                         lblStatus.Text = "下載中 " + value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
                     }
                 }
-                else if (line.IndexOf("[Merger]", StringComparison.OrdinalIgnoreCase) >= 0 || line.IndexOf("[ExtractAudio]", StringComparison.OrdinalIgnoreCase) >= 0)
+                else if (line.IndexOf("[Merger]", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         line.IndexOf("[ExtractAudio]", StringComparison.OrdinalIgnoreCase) >= 0)
                     lblStatus.Text = "下載完成，正在處理文件…";
                 else if (line.StartsWith("ERROR:", StringComparison.OrdinalIgnoreCase))
                     lblStatus.Text = lastErrorMessage = FriendlyError(line);
@@ -716,16 +787,20 @@ namespace YtDlpGuiMvp
                 btn.Enabled             = !busy;
             }
             btnDownload.Enabled         = !busy;
-            btnCancel.Enabled           = busy && allowCancel;
+            btnCancel.Enabled           =  busy && allowCancel;
             btnUpdateComponents.Enabled = !busy;
             btnBrowse.Enabled           = !busy;
 
-            cmbSubtitleLanguage.Enabled = !busy && selectedMode == 2;
-            cmbVideoResolution.Enabled  = !busy && selectedMode == 0;
+            chkDownloader.Enabled       = !busy;
             chkFirefox.Enabled          = !busy;
             chkPlaylist.Enabled         = !busy;
 
-            txtSavePath.Enabled           = !busy;
+            cmbMaxConnections.Enabled   = !busy && chkDownloader.Checked;
+            cmbSplitChunkSize.Enabled   = !busy && chkDownloader.Checked;
+            cmbSubtitleLanguage.Enabled = !busy && selectedMode == 2;
+            cmbVideoResolution.Enabled  = !busy && selectedMode == 0;
+
+            txtSavePath.Enabled         = !busy;
             txtUrl.Enabled              = !busy;
         }
 
@@ -829,13 +904,13 @@ namespace YtDlpGuiMvp
             try
             {
                 var info                        = new ProcessStartInfo(ytDlp, "--ignore-config -U");
-                info.WorkingDirectory           = appDir;
-                info.UseShellExecute            = false;
                 info.CreateNoWindow             = true;
                 info.RedirectStandardOutput     = true;
                 info.RedirectStandardError      = true;
                 info.StandardOutputEncoding     = Encoding.Default;
                 info.StandardErrorEncoding      = Encoding.Default;
+                info.WorkingDirectory           = appDir;
+                info.UseShellExecute            = false;
                 ConfigureProcessEnvironment(info, appDir);
                 using (var process = new Process())
                 {
@@ -960,7 +1035,7 @@ namespace YtDlpGuiMvp
                 return;
             }
 
-            bool subtitleMode = selectedMode == 2;
+            bool             subtitleMode   = (selectedMode == 2);
             SubtitleSnapshot subtitleBefore = null;
             try { if (subtitleMode) subtitleBefore = CaptureSubtitles(folder); }
             catch (Exception ex)
@@ -980,6 +1055,8 @@ namespace YtDlpGuiMvp
             SetBusy(true);
             lblStatus.Text          = "正在分析鏈接……";
             var args                = BuildArguments(url, folder, appDir);
+			AppendLog("[Command] yt-dlp "+args);
+			
             var worker              = new Thread(() => RunDownload(ytDlp, args, appDir, folder, subtitleMode, subtitleBefore, usedFirefoxCookies));
             worker.IsBackground     = true;
             worker.Start();
@@ -1004,14 +1081,28 @@ namespace YtDlpGuiMvp
             selectedMode = mode;
             for (int i = 0; i < btnSelectMode.Length; i++)
             {
-                bool selected = i == mode;
-                btnSelectMode[i].BackColor                  = selected ? Color.FromArgb(32, 103, 201) : Color.FromArgb(239, 244, 251);
-                btnSelectMode[i].ForeColor                  = selected ? Color.White                  : Color.FromArgb(36, 53, 77);
-                btnSelectMode[i].FlatAppearance.BorderColor = selected ? Color.FromArgb(21, 82, 173)  : Color.FromArgb(195, 208, 225);
+                if (i == mode)
+                {
+                    btnSelectMode[i].BackColor                  = Color.FromArgb(32, 103, 201);
+                    btnSelectMode[i].ForeColor                  = Color.White;
+                    btnSelectMode[i].FlatAppearance.BorderColor = Color.FromArgb(21, 82, 173) ;
+                }
+                else
+                {
+                    btnSelectMode[i].BackColor                  = Color.FromArgb(239, 244, 251);
+                    btnSelectMode[i].ForeColor                  = Color.FromArgb(36, 53, 77);
+                    btnSelectMode[i].FlatAppearance.BorderColor = Color.FromArgb(195, 208, 225);
+                }
             }
-            cmbSubtitleLanguage.Enabled = mode == 2 && btnDownload.Enabled;
-            cmbVideoResolution.Enabled  = mode == 0 && btnDownload.Enabled;
+            cmbSubtitleLanguage.Enabled                         = (mode == 2) && btnDownload.Enabled;
+            cmbVideoResolution.Enabled                          = (mode == 0) && btnDownload.Enabled;
             txtSavePath_EventHandler_TextChanged_UpdateFolderPreview();
+        }
+
+        private void chkDownloader_EventHandler_CheckedChanged()
+        {
+            cmbMaxConnections.Enabled = chkDownloader.Checked;
+            cmbSplitChunkSize.Enabled = chkDownloader.Checked;
         }
 
         private void txtSavePath_EventHandler_TextChanged_UpdateFolderPreview()
@@ -1030,22 +1121,44 @@ namespace YtDlpGuiMvp
         }
     #endregion /* Event Handler */
 
+    #region Get Downloads Path
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        static extern int SHGetKnownFolderPath(Guid rfid, uint dwFlags, IntPtr hToken, out IntPtr pszPath);
+
+        private static string GetDownloadsPath()
+        {
+            IntPtr pathPtr;
+            int    result = SHGetKnownFolderPath(new Guid("374DE290-123F-4565-9164-39C4925E467B"), 0, IntPtr.Zero, out pathPtr);
+            if (0 == result)
+            {
+                string path = Marshal.PtrToStringUni(pathPtr);
+                Marshal.FreeCoTaskMem(pathPtr);
+                return path;
+            }
+            throw new System.ComponentModel.Win32Exception(result);
+        }
+    #endregion /* Get Downloads Path */
+
     #region MESSAGE BOX
         private DialogResult MBOX_Q(string __MESSAGE__, string __CAPTION__ = null, MessageBoxButtons __BUTTON__ = MessageBoxButtons.OKCancel)
         {
-            return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, MessageBoxIcon.Question);
+            return MBOX(__MESSAGE__, __CAPTION__, __BUTTON__, MessageBoxIcon.Question);
         }
         private DialogResult MBOX_E(string __MESSAGE__, string __CAPTION__ = null, MessageBoxButtons __BUTTON__ = MessageBoxButtons.OK)
         {
-            return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, MessageBoxIcon.Error);
+            return MBOX(__MESSAGE__, __CAPTION__, __BUTTON__, MessageBoxIcon.Error);
         }
         private DialogResult MBOX_I(string __MESSAGE__, string __CAPTION__ = null, MessageBoxButtons __BUTTON__ = MessageBoxButtons.YesNo)
         {
-            return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, MessageBoxIcon.Information);
+            return MBOX(__MESSAGE__, __CAPTION__, __BUTTON__,MessageBoxIcon.Information);
         }
         private DialogResult MBOX_W(string __MESSAGE__, string __CAPTION__ = null, MessageBoxButtons __BUTTON__ = MessageBoxButtons.OK)
         {
-            return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, MessageBoxIcon.Warning);
+            return MBOX(__MESSAGE__, __CAPTION__, __BUTTON__, MessageBoxIcon.Warning);
+        }
+        private DialogResult MBOX  (string __MESSAGE__, string __CAPTION__       , MessageBoxButtons __BUTTON__, MessageBoxIcon __ICON__)
+        {
+            return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, __ICON__);
         }
     #endregion /* MESSAGE BOX */
     }

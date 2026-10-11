@@ -20,18 +20,24 @@ namespace YtDlpGuiMvp
 {
     internal static class ComponentInstaller
     {
-        internal const string YtDlpUrl                  = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
-        internal const string YtDlpChecksumsUrl         = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS";
-        internal const string YtDlpBackupUrl            = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe";
-        internal const string YtDlpBackupChecksumsUrl   = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/SHA2-256SUMS";
-        internal const string FfmpegUrl                 = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
-        internal const string FfmpegChecksumsUrl        = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/checksums.sha256";
-        internal const string FfmpegBackupUrl           = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
-        internal const string FfmpegBackupChecksumsUrl  = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256";
-        internal const string DenoUrl                   = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
-        internal const string DenoChecksumsUrl          = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip.sha256sum";
-        internal const string DenoBackupUrl             = "https://dl.deno.land/release/v2.9.6/deno-x86_64-pc-windows-msvc.zip";
-        internal const string DenoBackupChecksumsUrl    = "https://dl.deno.land/release/v2.9.6/deno-x86_64-pc-windows-msvc.zip.sha256sum";
+        // aria2.exe 
+        internal const    string    Aria2cUrl                 = "https://github.com/aria2/aria2/releases/latest/download/aria2-1.37.0-win-64bit-build1.zip";
+        internal const    string    Ariac2ChecksumsUrl        = "https://github.com/aria2/aria2/releases/latest/download/checksums.sha256";
+        // deno.exe 
+        internal const    string    DenoUrl                   = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
+        internal const    string    DenoChecksumsUrl          = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip.sha256sum";
+        internal const    string    DenoBackupUrl             = "https://dl.deno.land/release/v2.9.6/deno-x86_64-pc-windows-msvc.zip";
+        internal const    string    DenoBackupChecksumsUrl    = "https://dl.deno.land/release/v2.9.6/deno-x86_64-pc-windows-msvc.zip.sha256sum";
+        // ffmpeg.exe & ffprobe.exe
+        internal const    string    FfmpegUrl                 = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+        internal const    string    FfmpegChecksumsUrl        = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/checksums.sha256";
+        internal const    string    FfmpegBackupUrl           = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+        internal const    string    FfmpegBackupChecksumsUrl  = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256";
+        // yt-dlp.exe   
+        internal const    string    YtDlpUrl                  = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+        internal const    string    YtDlpChecksumsUrl         = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS";
+        internal const    string    YtDlpBackupUrl            = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe";
+        internal const    string    YtDlpBackupChecksumsUrl   = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/SHA2-256SUMS";
 
         private sealed class DownloadSource
         {
@@ -49,7 +55,7 @@ namespace YtDlpGuiMvp
 
         internal static string[] MissingComponents(string appDir, Boolean checkEnvPath = false)
         {
-            var binaries    = new string[] {"yt-dlp.exe", "ffmpeg.exe", "ffprobe.exe", "deno.exe"};
+            var binaries    = new string[] {"aria2c.exe", "deno.exe", "ffmpeg.exe", "ffprobe.exe", "yt-dlp.exe"};
             var result      = new List<string>();
 
             foreach (var binary in binaries)

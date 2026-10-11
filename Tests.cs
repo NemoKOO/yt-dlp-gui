@@ -81,11 +81,11 @@ namespace YtDlpGuiMvp
                 selectMode.Invoke(form, new object[] { 2 });
                 Check(!videoResolution.Enabled, "字幕模式禁用解析度");
                 string subtitles = (string)build.Invoke(form, new object[] { url, folder, appDir });
-                Check(subtitles.Contains("--skip-download") && subtitles.Contains("--sub-langs \"^zh-Hans$\"") && subtitles.Contains("--convert-subs srt"), "單一简體字幕參數");
+                Check(subtitles.Contains("--skip-download") && subtitles.Contains("--sub-langs \"^zh-Hant$\"") && subtitles.Contains("--convert-subs srt"), "單一繁體字幕參數");
                 Check(!subtitles.Contains("-S \"res:"), "字幕模式不帶影片畵質參數");
                 Check(!subtitles.Contains("zh.*,en.*"), "不能批量請求翻譯字幕");
-                subtitleLanguage.SelectedIndex = 1;
-                Check(((string)build.Invoke(form, new object[] { url, folder, appDir })).Contains("--sub-langs \"^zh-Hant$\""), "單一繁體字幕參數");
+                subtitleLanguage.SelectedIndex = 0;
+                Check(((string)build.Invoke(form, new object[] { url, folder, appDir })).Contains("--sub-langs \"^zh-Hans$\""), "單一简體字幕參數");
                 subtitleLanguage.SelectedIndex = 2;
                 Check(((string)build.Invoke(form, new object[] { url, folder, appDir })).Contains("--sub-langs \"^en$\""), "單一英文字幕參數");
 
@@ -254,7 +254,7 @@ namespace YtDlpGuiMvp
                 ComponentInstaller.ValidateExecutable(extracted, "ffmpeg.exe");
                 Check(File.Exists(extracted) && new FileInfo(extracted).Length == data.Length, "組件壓縮包安全提取");
                 string[] missing = ComponentInstaller.MissingComponents(folder);
-                Check(missing.Length == 4, "空目録組件检查");
+                Check(missing.Length == 5, "空目録組件检查");
             }
             finally
             {
