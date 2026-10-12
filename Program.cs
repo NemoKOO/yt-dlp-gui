@@ -28,7 +28,7 @@ using System.Windows.Forms;
 // 程序集的版本信息
 [assembly: AssemblyFileVersion("0.6.1")]
 [assembly: AssemblyInformationalVersion("Release")]
-[assembly: AssemblyVersion("0.6.1.*")]
+[assembly: AssemblyVersion("0.6.*")]
 #endregion /* Assembly Information */
 
 namespace YtDlpGuiMvp
@@ -86,8 +86,8 @@ namespace YtDlpGuiMvp
         private                  int                    selectedMode;
         private                  string                 lastErrorMessage;
         private                  string                 lastFolder;
-// [download] X% of Size at Speed ETA Time
-        private         readonly Regex                  percentPattern          = new Regex(@"\[download\]\s+(\d+(?:\.\d+)?)%", RegexOptions.Compiled);
+
+      //private         readonly Regex                  percentPattern          = new Regex(@"\[download\]\s+(\d+(?:\.\d+)?)%", RegexOptions.Compiled); // [download] X% of Size at Speed ETA Time
         private static  readonly Regex                  urlPattern              = new Regex("https?://[^\\s<>\\[\\]\\(\\)（）“”\\\"'，。；！？、]+",
                                                                                             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private         readonly SynchronizationContext ui;
@@ -98,7 +98,7 @@ namespace YtDlpGuiMvp
         private         readonly Button                 btnOpenDownloadFolder   = new Button();
         private         readonly Button                 btnUpdateComponents     = new Button();
         private         readonly Button[]               btnSelectMode           = { new Button(), new Button(), new Button() };
-        private         readonly CheckBox               chkDownloader           = new CheckBox();
+        private         readonly CheckBox               chkAria2c               = new CheckBox();
         private         readonly CheckBox               chkFirefox              = new CheckBox();
         private         readonly CheckBox               chkPlaylist             = new CheckBox();
         private         readonly ComboBox               cmbMaxConnections       = new ComboBox();
@@ -108,7 +108,7 @@ namespace YtDlpGuiMvp
         private         readonly Label                  lblStatus               = new Label();
         private         readonly Label                  lblSavePreview          = new Label();
         private         readonly Label                  lblUrlPreview           = new Label();
-        private         readonly ProgressBar            progress                = new ProgressBar();
+        private         readonly ProgressBar            pgbDownload             = new ProgressBar();
         private         readonly ReplaceOnPasteTextBox  txtUrl                  = new ReplaceOnPasteTextBox();
         private         readonly TextBox                txtLog                  = new TextBox();
         private         readonly TextBox                txtSavePath             = new TextBox();
@@ -127,7 +127,7 @@ namespace YtDlpGuiMvp
             AutoScaleMode   = System.Windows.Forms.AutoScaleMode.None/* System.Windows.Forms.AutoScaleMode.Font */;
             BackColor       = Color.FromArgb(237, 242, 248);
             Font            = new Font("Microsoft YaHei UI", 10F);
-            Icon            = SystemIcons.Application;
+          //Icon            = SystemIcons.Application;
             MinimumSize     = new Size(760, 700);
             Padding         = new Padding(14);
             Size            = new Size(960, 800);
@@ -136,14 +136,25 @@ namespace YtDlpGuiMvp
                               FileVersionInfo.GetVersionInfo(this.GetType().Assembly.Location).FileVersion +
                               "(" + Application.ProductVersion + " Revison: " + version.Revision + ", " +
                               " Build: " + version.Build + ")";
+            FormClosing    += OnFormClosing;
             ui              = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
 
             BuildUi();
             if (checkComponentsOnShown) Shown += (s, e) => CheckComponentsOnStartup();
         }
 
+        private void OnFormClosing(object sender, FormClosingEventArgs e)
+        {
+            string runtimeTemp = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".runtime-temp");
+            Directory.Delete(runtimeTemp, true);
+            Environment.Exit(0);
+        }
+
         private void BuildUi()
         {
+          //var resources                                   = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
+          //Icon                                            =  ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
+
             var root                                        = new TableLayoutPanel();
             root.Dock                                       = DockStyle.Fill;
             root.Padding                                    = new Padding(28, 20, 28, 20);
@@ -292,10 +303,10 @@ namespace YtDlpGuiMvp
             root.Controls.Add(lblSavePreview, 0, 9);
 
             var checkRow                                    = new FlowLayoutPanel();
-            chkDownloader.AutoSize                          = true;
-            chkDownloader.Text                              = "使用aria2c下載：";
-            chkDownloader.Margin                            = new Padding(0, 10, 0, 0);
-            chkDownloader.CheckedChanged                   += (s, e) => chkDownloader_EventHandler_CheckedChanged();
+            chkAria2c.AutoSize                              = true;
+            chkAria2c.Text                                  = "使用aria2c下載：";
+            chkAria2c.Margin                                = new Padding(0, 10, 0, 0);
+            chkAria2c.CheckedChanged                       += (s, e) => chkAria2c_EventHandler_CheckedChanged();
 
             chkFirefox.AutoSize                             = true;
             checkRow.Dock                                   = DockStyle.Fill;
@@ -319,7 +330,7 @@ namespace YtDlpGuiMvp
             cmbMaxConnections.Dock                          = DockStyle.Fill;
             cmbMaxConnections.DropDownStyle                 = ComboBoxStyle.DropDownList;
             cmbMaxConnections.FlatStyle                     = FlatStyle.Standard;
-            cmbMaxConnections.Items.AddRange(new object[] { " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8", 
+            cmbMaxConnections.Items.AddRange(new object[] { " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8",
                                                             " 9", "10", "11", "12", "13", "14", "15", "16" });
             cmbMaxConnections.Margin                        = new Padding(0, 10, 12, 0);
             cmbMaxConnections.SelectedIndex                 = 15;
@@ -337,12 +348,12 @@ namespace YtDlpGuiMvp
 
             checkRow.Controls.Add(chkFirefox);
             checkRow.Controls.Add(chkPlaylist);
-            checkRow.Controls.Add(chkDownloader);
+            checkRow.Controls.Add(chkAria2c);
             checkRow.Controls.Add(maxConnectionsLabel);
             checkRow.Controls.Add(cmbMaxConnections);
             checkRow.Controls.Add(chunkSizeLabel);
             checkRow.Controls.Add(cmbSplitChunkSize);
-            chkDownloader_EventHandler_CheckedChanged();
+            chkAria2c_EventHandler_CheckedChanged();
             root.Controls.Add(checkRow, 0, 10);
             ttpTips.SetToolTip(chkFirefox, "先用 Firefox 打開影片目標網址並刷新頁面，再勾選。Cookies 可能包含登録狀態。");
 
@@ -376,10 +387,10 @@ namespace YtDlpGuiMvp
             ttpTips.SetToolTip(btnUpdateComponents, "檢查四箇運行組件；缺少時從官方 GitHub 下載並校驗，完整時可更新 yt-dlp。");
             root.Controls.Add(buttonRow, 0, 11);
 
-            progress.Dock                                   = DockStyle.Fill;
-            progress.Minimum                                = 0;
-            progress.Maximum                                = 100;
-            root.Controls.Add(progress, 0, 12);
+            pgbDownload.Dock                                = DockStyle.Fill;
+            pgbDownload.Minimum                             = 0;
+            pgbDownload.Maximum                             = 100;
+            root.Controls.Add(pgbDownload, 0, 12);
 
             lblStatus.AutoEllipsis                          = true;
             lblStatus.Dock                                  = DockStyle.Fill;
@@ -473,15 +484,15 @@ namespace YtDlpGuiMvp
             args.Append("--ignore-config --newline --no-overwrites --no-post-overwrites ");
             args.Append(chkPlaylist.Checked ? "--yes-playlist ":"--no-playlist ");
 
-            if (chkDownloader.Checked && 
-                cmbMaxConnections.SelectedIndex < cmbMaxConnections.Items.Count && 
-                cmbSplitChunkSize.SelectedIndex < cmbSplitChunkSize.Items.Count) 
+            if (chkAria2c.Checked &&
+                cmbMaxConnections.SelectedIndex < cmbMaxConnections.Items.Count &&
+                cmbSplitChunkSize.SelectedIndex < cmbSplitChunkSize.Items.Count)
             {
                 string conns = cmbMaxConnections.Items[cmbMaxConnections.SelectedIndex].ToString();
                 string chunk = cmbSplitChunkSize.Items[cmbSplitChunkSize.SelectedIndex].ToString();
               // https://aria2.github.io/manual/en/html/aria2c.html#options
-              //args.Append("--downloader aria2c --downloader-args ").Append(Quote("aria2c:-x 32 -k 1M"));
-                args.Append("--downloader aria2c --downloader-args ").Append(Quote("aria2c:-x "+ conns + " -k " + chunk)).Append(' ');
+                args.Append("--downloader aria2c --downloader-args ")
+                    .Append(Quote("aria2c:-x "+ conns + " -k " + chunk)).Append(' ');
             }
             else
             {
@@ -499,7 +510,7 @@ namespace YtDlpGuiMvp
                     int preferredResolution = SelectedPreferredResolution();
                     if (preferredResolution > 0)
                     {
-                        string resolution = preferredResolution.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        string resolution = preferredResolution.ToString(CultureInfo.InvariantCulture);
 
                         args.Append("-t mp4 -S ").Append(Quote("res:" + resolution))
                             .Append("-o ").Append(Quote("%(uploader)s_%(title)s [%(id)s] [%(resolution)s].%(ext)s"))
@@ -623,7 +634,7 @@ namespace YtDlpGuiMvp
                             lblStatus.Text = "下載完成，但有 " + failedCount + " 箇 VTT 未能转换为 SRT；請查看運行記録。";
                         else if (code == 0)
                         {
-                            progress.Value = 100;
+                            pgbDownload.Value = 100;
                             lblStatus.Text = subtitleMode && convertedCount > 0
                                 ? "完成！已生成 " + convertedCount + " 箇 SRT 字幕。"
                                 : "完成！可點擊「打開保存目録」。";
@@ -717,23 +728,29 @@ namespace YtDlpGuiMvp
             if (String.IsNullOrEmpty(line)) return;
             PostUi(() =>
             {
-                AppendLog(line);
                 if (line.IndexOf("no subtitles", StringComparison.OrdinalIgnoreCase) >= 0) noSubtitles = true;
-                Match match = percentPattern.Match(line);
-                if (match.Success)
+
+                DownloadProgressInfo progress = null;
+                if (chkAria2c.Checked ? DownloadProgressParser.TryParseAria2c(line, out progress)
+                                      : DownloadProgressParser.TryParseYtDlp (line, out progress))
                 {
-                    double value;
-                    if (Double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value))
-                    {
-                        progress.Value = Math.Max(0, Math.Min(100, (int)Math.Round(value)));
-                        lblStatus.Text = "下載中 " + value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%";
-                    }
+                  //AppendLog(line);
+                    pgbDownload.Value = Math.Max(0, Math.Min(100, (int)Math.Round(progress.Percent)));
+                    lblStatus.Text = "[ 下載中 ] " + progress.Percent.ToString("F1", CultureInfo.InvariantCulture).PadLeft(5, ' ') +
+                                     "%，" + progress.SpeedValue.ToString().PadLeft(8, ' ') + progress.SpeedUnit + "（已下載："
+                                     + progress.DownloadedSize + "，文件大小："  + progress.TotalSize + "），剩餘時間："  + progress.ETA;
                 }
-                else if (line.IndexOf("[Merger]", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                else
+                {
+                    AppendLog(line);
+
+                    if (line.IndexOf("[Merger]"      , StringComparison.OrdinalIgnoreCase) >= 0 ||
                          line.IndexOf("[ExtractAudio]", StringComparison.OrdinalIgnoreCase) >= 0)
-                    lblStatus.Text = "下載完成，正在處理文件…";
-                else if (line.StartsWith("ERROR:", StringComparison.OrdinalIgnoreCase))
-                    lblStatus.Text = lastErrorMessage = FriendlyError(line);
+                        lblStatus.Text = "[ 下載完成 ] 正在處理文件…";
+                    else if (line.StartsWith("ERROR:", StringComparison.OrdinalIgnoreCase))
+                        lblStatus.Text = lastErrorMessage = FriendlyError(line);
+                }
+
             });
         }
 
@@ -791,12 +808,12 @@ namespace YtDlpGuiMvp
             btnUpdateComponents.Enabled = !busy;
             btnBrowse.Enabled           = !busy;
 
-            chkDownloader.Enabled       = !busy;
+            chkAria2c.Enabled       = !busy;
             chkFirefox.Enabled          = !busy;
             chkPlaylist.Enabled         = !busy;
 
-            cmbMaxConnections.Enabled   = !busy && chkDownloader.Checked;
-            cmbSplitChunkSize.Enabled   = !busy && chkDownloader.Checked;
+            cmbMaxConnections.Enabled   = !busy && chkAria2c.Checked;
+            cmbSplitChunkSize.Enabled   = !busy && chkAria2c.Checked;
             cmbSubtitleLanguage.Enabled = !busy && selectedMode == 2;
             cmbVideoResolution.Enabled  = !busy && selectedMode == 0;
 
@@ -807,24 +824,41 @@ namespace YtDlpGuiMvp
         private void CheckComponentsOnStartup()
         {
             string[] missing    = ComponentInstaller.MissingComponents(AppDomain.CurrentDomain.BaseDirectory, true);
-            if (0 == missing.Length) { lblStatus.Text = "運行組件完整，可以開始下載。"; return; }
+            if (0 == missing.Length)
+            {
+                chkAria2c.Checked = true;
+                chkAria2c.Enabled = true;
+                lblStatus.Text    = "運行組件完整，可以開始下載。";
+                return;
+            }
 
-            lblStatus.Text      = "首次使用需要安裝 " + missing.Length + " 箇運行組件。";
+            lblStatus.Text        = "首次使用需要安裝 " + missing.Length + " 箇運行組件。";
             if (DialogResult.Yes == MBOX_I("這是輕量公開版。首次使用需要從各項目的官方伺服器下載運行組件。\n\n缺少：\n" +
                                          String.Join("\n", missing) + "\n\n完整下載约 250 MB。" +
                                          "程式會自動重試可信備用綫路，並使用官方 SHA-256 校驗文件。現在安裝吗？",
                                          "首次運行設置")) StartComponentInstall();
-            else lblStatus.Text = "尚未安裝完整組件；可點击「檢查運行組件」繼續。";
+            else
+            {
+                chkAria2c.Checked = false;
+                chkAria2c.Enabled = false;
+                lblStatus.Text    = "尚未安裝完整組件；可點击「檢查運行組件」繼續。";
+            }
         }
 
         private void StartComponentInstall()
         {
             string appDir       = AppDomain.CurrentDomain.BaseDirectory;
             string[] missing    = ComponentInstaller.MissingComponents(appDir, true);
-            if (0 == missing.Length) { lblStatus.Text = "四箇運行組件均已安裝。"; return; }
+            if (0 == missing.Length)
+            {
+                chkAria2c.Checked = true;
+                chkAria2c.Enabled = true;
+                lblStatus.Text    = "五箇運行組件均已安裝。";
+                return;
+            }
 
             txtLog.Clear();
-            progress.Value      = 0;
+            pgbDownload.Value   = 0;
             cancelling          = false;
             AppendLog("將安裝：" + String.Join("、", missing));
             AppendLog("只使用項目官方或官方上游綫路；每箇文件安裝前都會校核官方 SHA-256。");
@@ -842,8 +876,8 @@ namespace YtDlpGuiMvp
                 ComponentInstaller.InstallMissing(appDir,
                                                   (value, message) => PostUi(() =>
                                                   {
-                                                      progress.Value  = Math.Max(0, Math.Min(100, value));
-                                                      lblStatus.Text  = message;
+                                                      pgbDownload.Value = Math.Max(0, Math.Min(100, value));
+                                                      lblStatus.Text    = message;
                                                   }),
                                                   message => PostUi(() => AppendLog(message)));
                 string[] remaining = ComponentInstaller.MissingComponents(appDir, true);
@@ -852,19 +886,28 @@ namespace YtDlpGuiMvp
                     SetBusy(false);
                     if (remaining.Length == 0)
                     {
-                        progress.Value  = 100;
-                        lblStatus.Text     = "運行組件安裝完成，可以開始下載。";
-                        AppendLog("組件安裝完成：yt-dlp、FFmpeg、FFprobe、Deno 均已就緒。");
+                        chkAria2c.Checked = true;
+                        chkAria2c.Enabled = true;
+                        pgbDownload.Value = 100;
+                        lblStatus.Text    = "運行組件安裝完成，可以開始下載。";
+                        AppendLog("組件安裝完成：aria2c、deno、yt-dlp、ffmpeg、ffprobe均已就緒。");
                     }
-                    else lblStatus.Text = "仍缺少組件：" + String.Join("、", remaining);
+                    else
+                    {
+                        chkAria2c.Checked = false;
+                        chkAria2c.Enabled = false;
+                        lblStatus.Text = "仍缺少組件：" + String.Join("、", remaining);
+                    }
                 });
             }
             catch (Exception ex)
             {
                 PostUi(() =>
                 {
+                    chkAria2c.Checked = false;
+                    chkAria2c.Enabled = false;
+                    lblStatus.Text    = "組件安裝失敗；已保留成功安裝的組件，請查看運行記録後重試。";
                     SetBusy(false);
-                    lblStatus.Text = "組件安裝失敗；已保留成功安裝的組件，請查看運行記録後重試。";
                     AppendLog("安裝失敗：" + ComponentInstaller.FriendlyNetworkMessage(ex));
                 });
             }
@@ -891,7 +934,7 @@ namespace YtDlpGuiMvp
             }
 
             txtLog.Clear();
-            progress.Value      = 0;
+            pgbDownload.Value   = 0;
             lblStatus.Text      = "正在檢查 yt-dlp 更新…";
             SetBusy(true, false);
             var worker          = new Thread(() => RunCoreUpdate(ytDlp, appDir));
@@ -1045,7 +1088,7 @@ namespace YtDlpGuiMvp
             }
 
             lastFolder              = folder;
-            progress.Value          = 0;
+            pgbDownload.Value       = 0;
             txtLog.Clear();
             cancelling              = false;
             noSubtitles             = false;
@@ -1055,8 +1098,8 @@ namespace YtDlpGuiMvp
             SetBusy(true);
             lblStatus.Text          = "正在分析鏈接……";
             var args                = BuildArguments(url, folder, appDir);
-			AppendLog("[Command] yt-dlp "+args);
-			
+            AppendLog("[Command] yt-dlp "+args);
+
             var worker              = new Thread(() => RunDownload(ytDlp, args, appDir, folder, subtitleMode, subtitleBefore, usedFirefoxCookies));
             worker.IsBackground     = true;
             worker.Start();
@@ -1099,10 +1142,10 @@ namespace YtDlpGuiMvp
             txtSavePath_EventHandler_TextChanged_UpdateFolderPreview();
         }
 
-        private void chkDownloader_EventHandler_CheckedChanged()
+        private void chkAria2c_EventHandler_CheckedChanged()
         {
-            cmbMaxConnections.Enabled = chkDownloader.Checked;
-            cmbSplitChunkSize.Enabled = chkDownloader.Checked;
+            cmbMaxConnections.Enabled = chkAria2c.Checked;
+            cmbSplitChunkSize.Enabled = chkAria2c.Checked;
         }
 
         private void txtSavePath_EventHandler_TextChanged_UpdateFolderPreview()
