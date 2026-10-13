@@ -1,22 +1,7 @@
 #region Namespace Dependencies
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Drawing;
 using System.Globalization;
-using System.IO;
-using System.Reflection;
-using System.Resources;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
-using System.Security;
-using System.Security.Permissions;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Windows.Forms;
 #endregion /* Namespace Dependencies */
 
 namespace YtDlpGuiMvp

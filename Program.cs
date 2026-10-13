@@ -26,7 +26,7 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("yt-dlp Portable Lightweight GUI (Recommended for Windows 10/11 x64)")]
 [assembly: AssemblyDescription("https://github.com/linblank/yt-dlp-gui-for-beginners")]
 // 程序集的版本信息
-[assembly: AssemblyFileVersion("0.6.1")]
+[assembly: AssemblyFileVersion("0.6.2")]
 [assembly: AssemblyInformationalVersion("Release")]
 [assembly: AssemblyVersion("0.6.*")]
 #endregion /* Assembly Information */
@@ -76,7 +76,7 @@ namespace YtDlpGuiMvp
         }
     }
 
-    internal sealed class MainForm : Form
+    internal sealed class MainForm : global::System.Windows.Forms.Form
     {
         private         volatile bool                   cancelling;
         private                  bool                   douyinCookieError;
@@ -127,7 +127,7 @@ namespace YtDlpGuiMvp
             AutoScaleMode   = System.Windows.Forms.AutoScaleMode.None/* System.Windows.Forms.AutoScaleMode.Font */;
             BackColor       = Color.FromArgb(237, 242, 248);
             Font            = new Font("Microsoft YaHei UI", 10F);
-          //Icon            = SystemIcons.Application;
+            Icon            = GetWinFormsIconFromResource()/* SystemIcons.Application */;
             MinimumSize     = new Size(760, 700);
             Padding         = new Padding(14);
             Size            = new Size(960, 800);
@@ -146,15 +146,12 @@ namespace YtDlpGuiMvp
         private void OnFormClosing(object sender, FormClosingEventArgs e)
         {
             string runtimeTemp = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".runtime-temp");
-            Directory.Delete(runtimeTemp, true);
+            if (Directory.Exists(runtimeTemp)) Directory.Delete(runtimeTemp, true);
             Environment.Exit(0);
         }
 
         private void BuildUi()
         {
-          //var resources                                   = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
-          //Icon                                            =  ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-
             var root                                        = new TableLayoutPanel();
             root.Dock                                       = DockStyle.Fill;
             root.Padding                                    = new Padding(28, 20, 28, 20);
@@ -433,6 +430,21 @@ namespace YtDlpGuiMvp
             return label;
         }
 
+        private Icon GetWinFormsIconFromResource()
+        {
+            Assembly asm   = Assembly.GetExecutingAssembly();
+        #if DEBUG
+            string[] names = asm.GetManifestResourceNames();
+            string   text  = string.Empty;
+            foreach(var name in names) text += name + "\r\n";
+            MBOX_I(text);
+        #endif
+            using (var stream = asm.GetManifestResourceStream("yt-dlp.ico"))
+            {
+                if (null == stream)                 return SystemIcons.Application;
+                using (var icon = new Icon(stream)) return (Icon) icon.Clone();
+            }
+        }
 
         private static string ExtractPreferredUrl(string input)
         {

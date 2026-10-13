@@ -16,7 +16,8 @@ if (      Test-Path -LiteralPath $testExe  ) { del $testExe }
 
 #https://github.com/yt-dlp/yt-dlp/blob/master/devscripts/logo.ico
 #$compiler /langversion:?
-& $compiler /nologo /target:winexe /optimize /resource:yt-dlp.resx /win32icon:yt-dlp.ico  "/out:$gui"     /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll $componentInstaller $downloadProgressParser $program
+#$compiler /resource:logo.ico,logo.ico ：表示把 logo.ico 作爲嵌入資源加入到 EXE 中，資源名稱也叫logo.ico
+& $compiler /nologo /target:winexe /optimize /resource:yt-dlp.ico,yt-dlp.ico /win32icon:yt-dlp.ico  "/out:$gui"     /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll $componentInstaller $downloadProgressParser $program
 if ($LASTEXITCODE -ne 0) { throw 'GUI compilation failed.' }
 
 & $compiler /nologo /target:exe    /main:YtDlpGuiMvp.ArgumentTests  "/out:$testExe" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll $componentInstaller $downloadProgressParser $program $tests

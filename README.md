@@ -71,7 +71,7 @@
 源碼文件包括 `Program.cs`、`ComponentInstaller.cs`、`Tests.cs` 和 `build.ps1`。在 Windows PowerShell 中執行：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .uild.ps1
+powershell -ExecutionPolicy Bypass -File .\Build.ps1
 ```
 
 構建腳本使用 Windows 自帶的 .NET Framework C# 編譯器，不需要另裝 .NET SDK。測試覆蓋參數生成、網址提取、分類目録、VTT→SRT、本地中文編碼、組件缺失檢測、兩種官方校驗清單格式、壓縮包定向提取及備用綫路配置；常規構建測試不會下載大型組件。
