@@ -8,7 +8,7 @@
 
 ## 第一次使用
 
-1. 完整解壓 Release 中的 `yt-dlp-gui-v0.6.1-windows-x64.zip`，不要直接在壓縮包裡運行。
+1. 完整解壓 Release 中的 `yt-dlp-gui-v0.6.2-windows-x64.zip`，不要直接在壓縮包裡運行。
 2. 雙擊 `yt-dlp-gui.exe`。
 3. 首次運行會列出缺少的組件。點擊「是」後開始下載，完整下載量約 250 MB（ffmpeg文件較大，請耐心等待）。
 4. 依次下載程式並校核其官方 SHA-256、檢查 Windows 可執行文件格式，再放入程式目録。下載或校驗失敗的文件不會安裝。
@@ -18,11 +18,12 @@
 
 | 組件 | 首選來源 | 備用來源 |
 | --- | --- | --- |
-| yt-dlp | `yt-dlp/yt-dlp` 最新穩定版 | 同一官方倉庫的已知穩定版本 |
+| aria2 | `aria2/aria2` GitHub Release | N/A |
+| deno | `denoland/deno` GitHub Release | Deno 官方 `dl.deno.land` CDN |
 | FFmpeg / FFprobe | `yt-dlp/FFmpeg-Builds` | 其上游項目 `BtbN/FFmpeg-Builds` |
-| Deno | `denoland/deno` GitHub Release | Deno 官方 `dl.deno.land` CDN |
+| yt-dlp | `yt-dlp/yt-dlp` 最新穩定版 | 同一官方倉庫的已知穩定版本 |
 
-如果自動安裝一直失敗，也可以從 `THIRD_PARTY_NOTICES.md` 列出的官方項目手動下載 Windows x64 文件，將 `yt-dlp.exe`、`ffmpeg.exe`、`ffprobe.exe` 和 `deno.exe` 放在 `yt-dlp-gui.exe` 旁邊。
+如果自動安裝一直失敗，也可以從 `THIRD_PARTY_NOTICES.md` 列出的官方項目手動下載 Windows x64 文件，將 `aria2c.exe`、`deno.exe`、`ffmpeg.exe`、`ffprobe.exe` 和 `yt-dlp.exe` 放在 `yt-dlp-gui.exe` 旁邊。
 
 ## 下載視頻、音頻和字幕
 
@@ -68,7 +69,7 @@
 
 ## 構建與測試
 
-源碼文件包括 `Program.cs`、`ComponentInstaller.cs`、`Tests.cs` 和 `build.ps1`。在 Windows PowerShell 中執行：
+源碼文件包括 `ComponentInstaller.cs`、`DownloadProgressParser.cs`、`Program.cs`、`Tests.cs` 和 `build.ps1`。在 Windows PowerShell 中執行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Build.ps1
@@ -78,6 +79,6 @@ powershell -ExecutionPolicy Bypass -File .\Build.ps1
 
 ## 許可證與第三方組件
 
-本圖形界面源碼使用 MIT License，參見 `LICENSE`。首次運行下載的 yt-dlp、FFmpeg 和 Deno 是獨立程式，分別受各自許可證約束，來源和許可鏈接見 `THIRD_PARTY_NOTICES.md`。
+本圖形界面源碼使用 MIT License，參見 `LICENSE`。首次運行下載的 aria2c、deno、FFmpeg 和 yt-dlp 是獨立程式，分別受各自許可證約束，來源和許可鏈接見 `THIRD_PARTY_NOTICES.md`。
 
 輕量 Release 不包含這些第三方二進制。若你自行製作包含第三方二進制的完整整合包，需要自行履行相應許可證的再分發義務；不要直接把本機下載後的四箇組件提交進本倉庫。

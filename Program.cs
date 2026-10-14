@@ -937,7 +937,7 @@ namespace YtDlpGuiMvp
                 return;
             }
             string ytDlp = Path.Combine(appDir, "yt-dlp.exe");
-            if (DialogResult.Yes != MBOX_I("檢查完成：yt-dlp、FFmpeg、FFprobe 和 Deno 均已安裝。\n\n" +
+            if (DialogResult.Yes != MBOX_I("檢查完成：aria2、deno、FFmpeg、FFprobe 和 yt-dlp 均已安裝。\n\n" +
                                            "是否繼續使用 yt-dlp 官方自更新功能檢查下載核心的新版本？\n\n\n\n" +
                                            "（本界面、FFmpeg、Deno不會因此更新。）", "運行組件完整"))
             {

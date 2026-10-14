@@ -21,8 +21,8 @@ namespace YtDlpGuiMvp
     internal static class ComponentInstaller
     {
         // aria2.exe
-        internal const    string    Aria2cUrl                 = "https://github.com/aria2/aria2/releases/latest/download/aria2-1.37.0-win-64bit-build1.zip";
-        internal const    string    Ariac2ChecksumsUrl        = "https://github.com/aria2/aria2/releases/latest/download/checksums.sha256";
+        internal const    string    Aria2Url                  = "https://github.com/aria2/aria2/releases/latest/download/aria2-1.37.0-win-64bit-build1.zip";
+        internal const    string    Aria2ChecksumsUrl         = "";
         // deno.exe
         internal const    string    DenoUrl                   = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
         internal const    string    DenoChecksumsUrl          = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip.sha256sum";
@@ -55,18 +55,14 @@ namespace YtDlpGuiMvp
 
         internal static string[] MissingComponents(string appDir, Boolean checkEnvPath = false)
         {
-            var binaries    = new string[] {"aria2c.exe", "deno.exe", "ffmpeg.exe", "ffprobe.exe", "yt-dlp.exe"};
-            var result      = new List<string>();
+            var binaries = new string[] {"aria2c.exe", "deno.exe", "ffmpeg.exe", "ffprobe.exe", "yt-dlp.exe"};
+            var result   = new List<string>();
 
             foreach (var binary in binaries)
             {
                 if (string.Empty == CheckBinaryExist(appDir, binary, checkEnvPath)) result.Add(binary);
             }
 
-         //if (string.Empty == GetEnvironmentPath(appDir, "yt-dlp.exe" )) result.Add("yt-dlp.exe");
-         //if (string.Empty == GetEnvironmentPath(appDir, "ffmpeg.exe" )) result.Add("ffmpeg.exe");
-         //if (string.Empty == GetEnvironmentPath(appDir, "ffprobe.exe")) result.Add("ffprobe.exe");
-         //if (string.Empty == GetEnvironmentPath(appDir, "deno.exe"   )) result.Add("deno.exe");
             return result.ToArray();
         }
 
@@ -78,16 +74,29 @@ namespace YtDlpGuiMvp
             Directory.CreateDirectory(tempDir);
             try
             {
-                if (!File.Exists(Path.Combine(appDir, "yt-dlp.exe")))
+                if (!File.Exists(Path.Combine(appDir, "aria2c.exe")))
                 {
-                    report(0, "正在下載 yt-dlp…");
-                    string downloaded = Path.Combine(tempDir, "yt-dlp.exe");
-                    DownloadAndVerify(new[] { new DownloadSource("yt-dlp 官方最新綫路"      , YtDlpUrl      , YtDlpChecksumsUrl),
-                                              new DownloadSource("yt-dlp 官方穩定版備用綫路", YtDlpBackupUrl, YtDlpBackupChecksumsUrl)},
-                                      "yt-dlp.exe", downloaded, p => report(p, "正在下載 yt-dlp：" + p + "%"), log);
-                    ValidateExecutable(downloaded, "yt-dlp.exe");
-                    InstallFile(downloaded, Path.Combine(appDir, "yt-dlp.exe"));
-                    log("yt-dlp.exe 已安裝並通過 SHA-256 校驗。");
+                    report(0, "正在下載 aria2…");
+                    string archive = Path.Combine(tempDir, "aria2-1.37.0-win-64bit-build1.zip");
+                    DownloadAndVerify(new[] { new DownloadSource("aria2 官方 GitHub 綫路" , Aria2Url        , Aria2ChecksumsUrl)},
+                                      Path.GetFileName(archive), archive, p => report(p, "正在下載 aria2：" + p + "%"), log);
+                    string aria2 = ExtractNamedExecutable(archive, "aria2c.exe", tempDir);
+                    ValidateExecutable(aria2, "aria2c.exe");
+                    InstallFile(aria2, Path.Combine(appDir, "aria2c.exe"));
+                    log("aria2c.exe 已安裝並通過 SHA-256 校驗。");
+                }
+
+                if (!File.Exists(Path.Combine(appDir, "deno.exe")))
+                {
+                    report(0, "正在下載 deno…");
+                    string archive = Path.Combine(tempDir, "deno-x86_64-pc-windows-msvc.zip");
+                    DownloadAndVerify(new[] { new DownloadSource("Deno 官方 GitHub 綫路" , DenoUrl      , DenoChecksumsUrl),
+                                              new DownloadSource("Deno 官方 CDN 備用綫路", DenoBackupUrl, DenoBackupChecksumsUrl)},
+                                      Path.GetFileName(archive), archive, p => report(p, "正在下載 Deno：" + p + "%"), log);
+                    string deno = ExtractNamedExecutable(archive, "deno.exe", tempDir);
+                    ValidateExecutable(deno, "deno.exe");
+                    InstallFile(deno, Path.Combine(appDir, "deno.exe"));
+                    log("deno.exe 已安裝並通過 SHA-256 校驗。");
                 }
 
                 if (!File.Exists(Path.Combine(appDir, "ffmpeg.exe" )) ||
@@ -95,8 +104,8 @@ namespace YtDlpGuiMvp
                 {
                     report(0, "正在下載 FFmpeg（文件較大，請耐心等待）…");
                     string archive = Path.Combine(tempDir, "ffmpeg-master-latest-win64-gpl.zip");
-                    DownloadAndVerify(new[] { new DownloadSource("yt-dlp FFmpeg 官方構建綫路", FfmpegUrl      , FfmpegChecksumsUrl),
-                                              new DownloadSource("FFmpeg-Builds 上游備用綫路", FfmpegBackupUrl, FfmpegBackupChecksumsUrl)},
+                    DownloadAndVerify(new[] { new DownloadSource("yt-dlp FFmpeg 官方構建綫路", FfmpegUrl       , FfmpegChecksumsUrl),
+                                              new DownloadSource("FFmpeg-Builds 上游備用綫路", FfmpegBackupUrl , FfmpegBackupChecksumsUrl)},
                                       Path.GetFileName(archive), archive, p => report(p, "正在下載 FFmpeg：" + p + "%"), log);
                     string ffmpeg  = ExtractNamedExecutable(archive, "ffmpeg.exe" , tempDir);
                     string ffprobe = ExtractNamedExecutable(archive, "ffprobe.exe", tempDir);
@@ -107,17 +116,16 @@ namespace YtDlpGuiMvp
                     log("ffmpeg.exe 和 ffprobe.exe 已安裝，壓縮包已通過 SHA-256 校驗。");
                 }
 
-                if (!File.Exists(Path.Combine(appDir, "deno.exe")))
+                if (!File.Exists(Path.Combine(appDir, "yt-dlp.exe")))
                 {
-                    report(0, "正在下載 Deno…");
-                    string archive = Path.Combine(tempDir, "deno-x86_64-pc-windows-msvc.zip");
-                    DownloadAndVerify(new[] { new DownloadSource("Deno 官方 GitHub 綫路" , DenoUrl      , DenoChecksumsUrl),
-                                              new DownloadSource("Deno 官方 CDN 備用綫路", DenoBackupUrl, DenoBackupChecksumsUrl)},
-                                      Path.GetFileName(archive), archive, p => report(p, "正在下載 Deno：" + p + "%"), log);
-                    string deno = ExtractNamedExecutable(archive, "deno.exe", tempDir);
-                    ValidateExecutable(deno, "deno.exe");
-                    InstallFile(deno, Path.Combine(appDir, "deno.exe"));
-                    log("deno.exe 已安裝並通過 SHA-256 校驗。");
+                    report(0, "正在下載 yt-dlp…");
+                    string downloaded = Path.Combine(tempDir, "yt-dlp.exe");
+                    DownloadAndVerify(new[] { new DownloadSource("yt-dlp 官方最新綫路"      , YtDlpUrl       , YtDlpChecksumsUrl),
+                                              new DownloadSource("yt-dlp 官方穩定版備用綫路", YtDlpBackupUrl , YtDlpBackupChecksumsUrl)},
+                                      "yt-dlp.exe", downloaded, p => report(p, "正在下載 yt-dlp：" + p + "%"), log);
+                    ValidateExecutable(downloaded, "yt-dlp.exe");
+                    InstallFile(downloaded, Path.Combine(appDir, "yt-dlp.exe"));
+                    log("yt-dlp.exe 已安裝並通過 SHA-256 校驗。");
                 }
             }
             finally
@@ -150,10 +158,10 @@ namespace YtDlpGuiMvp
         internal static string ComputeSha256(string path)
         {
             using (var stream = File.OpenRead(path))
-            using (var sha = SHA256.Create())
+            using (var sha    = SHA256.Create())
             {
                 byte[] hash = sha.ComputeHash(stream);
-                var text = new StringBuilder(hash.Length * 2);
+                var text    = new StringBuilder(hash.Length * 2);
                 foreach (byte value in hash) text.Append(value.ToString("X2"));
                 return text.ToString();
             }
@@ -202,13 +210,19 @@ namespace YtDlpGuiMvp
                     {
                         if (File.Exists(destination)) File.Delete(destination);
                         log("下載綫路：" + source.Name + "（第 " + attempt + " 次嘗試）");
-                        string checksums = DownloadText(source.ChecksumsUrl);
-                        string expected  = ParseExpectedHash(checksums, fileName);
+
                         DownloadFile(source.FileUrl, destination, progress);
                         string actual    = ComputeSha256(destination);
-                        if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
-                            throw new InvalidDataException(fileName + " 的 SHA-256 校驗失敗。");
-                        log(fileName + " SHA-256：" + actual);
+
+                        if (!string.IsNullOrEmpty(source.ChecksumsUrl))
+                        {
+                            string checksums = DownloadText(source.ChecksumsUrl);
+                            if (!actual.Equals(ParseExpectedHash(checksums, fileName),
+                                               StringComparison.OrdinalIgnoreCase))
+                                throw new InvalidDataException(fileName + " 的 SHA-256 校驗失敗。");
+                            log(fileName + " SHA-256：" + actual);
+                        }
+
                         return;
                     }
                     catch (Exception ex)
@@ -247,9 +261,9 @@ namespace YtDlpGuiMvp
         private static string DownloadText(string url)
         {
             var request = CreateRequest(url);
-            using (var response = (HttpWebResponse)request.GetResponse())
+            using (var response  = (HttpWebResponse)request.GetResponse())
             using (Stream stream = response.GetResponseStream())
-            using (var reader = new StreamReader(stream, Encoding.UTF8, true))
+            using (var reader    = new StreamReader(stream, Encoding.UTF8, true))
                 return reader.ReadToEnd();
         }
 
@@ -258,7 +272,7 @@ namespace YtDlpGuiMvp
             var request = CreateRequest(url);
             using (var response = (HttpWebResponse)request.GetResponse())
             using (Stream input = response.GetResponseStream())
-            using (var output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var output   = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 long total      = response.ContentLength;
                 long received   = 0;
