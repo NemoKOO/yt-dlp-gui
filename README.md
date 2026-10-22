@@ -1,4 +1,4 @@
-# 視頻音頻字幕下載 MVP v0.6.1（Windows x64）
+# 視頻音頻字幕下載 MVP v0.6.2（Windows x64）
 
 這是一箇面向普通 Windows 用戸的 yt-dlp 圖形界面。它把複製鏈接、選擇 MP4/MP3/SRT、分類保存和 Cookies 選項放進一箇窗口，不要求用戸輸入命令。本項目不是 yt-dlp 官方産品。
 

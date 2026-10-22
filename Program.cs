@@ -737,7 +737,7 @@ namespace YtDlpGuiMvp
 
         private void HandleLine(string line)
         {
-            if (String.IsNullOrEmpty(line)) return;
+            if (String.IsNullOrEmpty(line) || string.IsNullOrWhiteSpace(line)) return;
             PostUi(() =>
             {
                 if (line.IndexOf("no subtitles", StringComparison.OrdinalIgnoreCase) >= 0) noSubtitles = true;
