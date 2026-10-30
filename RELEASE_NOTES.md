@@ -1,10 +1,16 @@
+# v0.6.3 — 支援「暗黑模式」
+- 引用外部倉庫`Dark-Mode-Forms`，支援「暗黑模式」
+- 「暗黑模式」跟隨系統設置
+- 啓用「暗黑模式」後，FlatProgressBar、Messenger將接管ProgressBar、MessageBox.Show()，獲取更好的相容性
+- 退出程式時，刪除臨時文件夾「.component-cache-*」
+
 # v0.6.2 — 支援多綫程下載
 
 - 更新下載文件名模板："%(uploader)s_%(title)s_%(resolution)s.%(ext)s"
 - 下載文件的默認保存路徑更新爲「Downloads」
 - 支援調用`aria2c` 或 `yt-dlp` 多綫程下載，並優化下載進度信息顯示
 - 「運行日誌」輸出「yt-dlp命令行」
-- 退出程式時刪除臨時文件夾「.runtime-temp」
+- 退出程式時，刪除臨時文件夾「.runtime-temp」
 - 設置 EXE 文件圖標、WinForms 窗口圖標
 - 增加程序集信息與版本信息
 

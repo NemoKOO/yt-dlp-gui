@@ -32,7 +32,11 @@ namespace YtDlpGuiMvp
                     message => Console.WriteLine(message));
                 return ComponentInstaller.MissingComponents(args[1]).Length == 0 ? 0 : 1;
             }
+        #if __DARK_THEME_SUPPORTED__
+            using (var form = new MainForm(false, false))
+        #else
             using (var form = new MainForm(false))
+        #endif
             {
                 Check(Program.IsWindows7OrOlder(PlatformID.Win32NT, new Version(6, 1)), "Windows 7 應收到兼容性提示");
                 Check(!Program.IsWindows7OrOlder(PlatformID.Win32NT, new Version(6, 2)), "Windows 8 不應誤判爲 Windows 7");

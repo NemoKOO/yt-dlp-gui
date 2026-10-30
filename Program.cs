@@ -26,13 +26,19 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("yt-dlp Portable Lightweight GUI (Recommended for Windows 10/11 x64)")]
 [assembly: AssemblyDescription("https://github.com/linblank/yt-dlp-gui-for-beginners")]
 // 程序集的版本信息
-[assembly: AssemblyFileVersion("0.6.2")]
+[assembly: AssemblyFileVersion("0.6.3")]
 [assembly: AssemblyInformationalVersion("Release")]
 [assembly: AssemblyVersion("0.6.*")]
 #endregion /* Assembly Information */
 
 namespace YtDlpGuiMvp
 {
+#if __DARK_THEME_SUPPORTED__
+    using SystemTheme     = DarkModeForms.DarkModeCS;
+    using FlatProgressBar = DarkModeForms.FlatProgressBar;
+    using Messenger       = DarkModeForms.Messenger;
+#endif
+
     internal static class Program
     {
         [STAThread]
@@ -86,11 +92,13 @@ namespace YtDlpGuiMvp
         private                  int                    selectedMode;
         private                  string                 lastErrorMessage;
         private                  string                 lastFolder;
-
       //private         readonly Regex                  percentPattern          = new Regex(@"\[download\]\s+(\d+(?:\.\d+)?)%", RegexOptions.Compiled); // [download] X% of Size at Speed ETA Time
         private static  readonly Regex                  urlPattern              = new Regex("https?://[^\\s<>\\[\\]\\(\\)（）“”\\\"'，。；！？、]+",
                                                                                             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private         readonly SynchronizationContext ui;
+    #if __DARK_THEME_SUPPORTED__
+        private                  SystemTheme            sysTheme                = null;
+    #endif
 
         private         readonly Button                 btnBrowse               = new Button();
         private         readonly Button                 btnCancel               = new Button();
@@ -108,7 +116,11 @@ namespace YtDlpGuiMvp
         private         readonly Label                  lblStatus               = new Label();
         private         readonly Label                  lblSavePreview          = new Label();
         private         readonly Label                  lblUrlPreview           = new Label();
+    #if __DARK_THEME_SUPPORTED__
+        private         readonly FlatProgressBar        pgbDownload             = new FlatProgressBar();
+    #else
         private         readonly ProgressBar            pgbDownload             = new ProgressBar();
+    #endif  
         private         readonly ReplaceOnPasteTextBox  txtUrl                  = new ReplaceOnPasteTextBox();
         private         readonly TextBox                txtLog                  = new TextBox();
         private         readonly TextBox                txtSavePath             = new TextBox();
@@ -119,8 +131,11 @@ namespace YtDlpGuiMvp
             public readonly HashSet<string> Vtt = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             public readonly HashSet<string> Srt = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
-
-        public MainForm(bool checkComponentsOnShown = true)
+    #if __DARK_THEME_SUPPORTED__
+        public MainForm(bool checkComponentsOnShown = true, bool appDarkModeSupported = true)
+    #else
+        public MainForm(bool checkComponentsOnShown = true, bool appDarkModeSupported = false)
+    #endif
         {
             var version     = Assembly.GetExecutingAssembly().GetName().Version;
 
@@ -139,15 +154,74 @@ namespace YtDlpGuiMvp
             FormClosing    += OnFormClosing;
             ui              = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
 
+        #if __DARK_THEME_SUPPORTED__
+            if (IsDarkModeSupported(appDarkModeSupported))
+            {
+                //https://github.com/BlueMystical/Dark-Mode-Forms/
+                sysTheme = new SystemTheme(this, true, true)
+                {
+                    //[Optional] Choose your preferred color mode here:
+                    ColorMode = SystemTheme.DisplayMode.DarkMode
+                };
+
             BuildUi();
-            if (checkComponentsOnShown) Shown += (s, e) => CheckComponentsOnStartup();
+
+            if (checkComponentsOnShown) Shown += (s, e) =>
+                                                 {
+                                                 // Render Buttons of SelectMode since sysTheme is initialized
+                                                    btnSelectMode_EventHandler_Click_SelectMode(0);
+                                                    StyleButton(btnDownload, sysTheme.OScolors.Accent,
+                                                                             sysTheme.OScolors.TextActive);
+                                                    StyleButton(btnUpdateComponents, ControlPaint.Dark(Color.FromArgb(221, 241, 238)),
+                                                                                     ControlPaint.Light(Color.FromArgb(17, 105, 98)));
+                                                    pgbDownload.ProgressBarColor = ControlPaint.Light(Color.FromArgb(198, 239, 206));
+                                                    CheckComponentsOnStartup();
+                                                 };
+            }
+            else
+        #endif
+            {
+                BuildUi();
+
+                if (checkComponentsOnShown) Shown += (s, e) => CheckComponentsOnStartup();
+            }
         }
 
         private void OnFormClosing(object sender, FormClosingEventArgs e)
         {
             string runtimeTemp = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".runtime-temp");
-            if (Directory.Exists(runtimeTemp)) Directory.Delete(runtimeTemp, true);
+            if (Directory.Exists(runtimeTemp)) SafeRemoveDirectory(runtimeTemp);
+
+            string[] dirs = Directory.GetDirectories(AppDomain.CurrentDomain.BaseDirectory,
+                                                     ".component-cache-*", SearchOption.TopDirectoryOnly);
+            foreach (string dir in dirs)
+            {
+                try
+                {
+                    SafeRemoveDirectory(dir);
+                }
+                catch (Exception ex)
+                {
+                    MBOX_W("刪除失敗: " + dir + " => " + ex.Message);
+                }
+            }
+
             Environment.Exit(0);
+        }
+
+        private static void SafeRemoveDirectory(string path)
+        {
+            // 去除文檔只讀、隱藏等屬性，避免刪除失敗
+            foreach (string file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+                File.SetAttributes(file, FileAttributes.Normal);
+    
+            // 去除資料夾只讀、隱藏等屬性，避免刪除失敗
+            foreach (string sub in Directory.GetDirectories(path, "*", SearchOption.AllDirectories))
+                File.SetAttributes(sub, FileAttributes.Normal);
+    
+            File.SetAttributes(path, FileAttributes.Normal);
+            
+            Directory.Delete(path, true);
         }
 
         private void BuildUi()
@@ -556,7 +630,12 @@ namespace YtDlpGuiMvp
             return host.Equals("douyin.com", StringComparison.OrdinalIgnoreCase) ||
                    host.EndsWith(".douyin.com", StringComparison.OrdinalIgnoreCase);
         }
-
+    #if __DARK_THEME_SUPPORTED__
+        private bool IsDarkModeSupported(bool appDarkModeSupported = true)
+        {
+            return (appDarkModeSupported && (SystemTheme.GetWindowsColorMode() <= 0));
+        }
+    #endif
         private static string Quote(string value)
         {
             var result = new StringBuilder("\"");
@@ -1136,17 +1215,37 @@ namespace YtDlpGuiMvp
             selectedMode = mode;
             for (int i = 0; i < btnSelectMode.Length; i++)
             {
-                if (i == mode)
+            #if __DARK_THEME_SUPPORTED__
+                if ((null != sysTheme) && (sysTheme.IsDarkMode))
                 {
-                    btnSelectMode[i].BackColor                  = Color.FromArgb(32, 103, 201);
-                    btnSelectMode[i].ForeColor                  = Color.White;
-                    btnSelectMode[i].FlatAppearance.BorderColor = Color.FromArgb(21, 82, 173) ;
+                    if (i == mode)
+                    {
+                        btnSelectMode[i].BackColor                  = sysTheme.OScolors.Accent;
+                        btnSelectMode[i].ForeColor                  = sysTheme.OScolors.TextActive;
+                        btnSelectMode[i].FlatAppearance.BorderColor = sysTheme.OScolors.Accent;
+                    }
+                    else
+                    {
+                        btnSelectMode[i].BackColor                  = sysTheme.OScolors.Control;
+                        btnSelectMode[i].ForeColor                  = sysTheme.OScolors.TextInactive;
+                        btnSelectMode[i].FlatAppearance.BorderColor = sysTheme.OScolors.Control;
+                    }
                 }
                 else
+            #endif
                 {
-                    btnSelectMode[i].BackColor                  = Color.FromArgb(239, 244, 251);
-                    btnSelectMode[i].ForeColor                  = Color.FromArgb(36, 53, 77);
-                    btnSelectMode[i].FlatAppearance.BorderColor = Color.FromArgb(195, 208, 225);
+                    if (i == mode)
+                    {
+                        btnSelectMode[i].BackColor                  = Color.FromArgb(32, 103, 201);
+                        btnSelectMode[i].ForeColor                  = Color.White;
+                        btnSelectMode[i].FlatAppearance.BorderColor = Color.FromArgb(21, 82, 173) ;
+                    }
+                    else
+                    {
+                        btnSelectMode[i].BackColor                  = Color.FromArgb(239, 244, 251);
+                        btnSelectMode[i].ForeColor                  = Color.FromArgb(36, 53, 77);
+                        btnSelectMode[i].FlatAppearance.BorderColor = Color.FromArgb(195, 208, 225);
+                    }
                 }
             }
             cmbSubtitleLanguage.Enabled                         = (mode == 2) && btnDownload.Enabled;
@@ -1213,6 +1312,10 @@ namespace YtDlpGuiMvp
         }
         private DialogResult MBOX  (string __MESSAGE__, string __CAPTION__       , MessageBoxButtons __BUTTON__, MessageBoxIcon __ICON__)
         {
+        #if __DARK_THEME_SUPPORTED__
+            if ( null != sysTheme)
+                return Messenger.MessageBox(__MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, __ICON__);
+        #endif
             return MessageBox.Show(this, __MESSAGE__, __CAPTION__ ?? Process.GetCurrentProcess().ProcessName, __BUTTON__, __ICON__);
         }
     #endregion /* MESSAGE BOX */

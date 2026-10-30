@@ -1,0 +1,3 @@
+[submodule "DarkMode"]
+	path = DarkMode
+	url = https://github.com/BlueMystical/Dark-Mode-Forms
