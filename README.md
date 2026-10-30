@@ -69,7 +69,7 @@
 
 ## 構建與測試
 
-源碼文件包括 `ComponentInstaller.cs`、`DarkMode\src\DarkModeForms\*.cs`、`DownloadProgressParser.cs`、`DownloadProgressParser.cs`、`Program.cs`、`Tests.cs` 和 `build.ps1`。在 Windows PowerShell 中執行：
+源碼文件包括 `ComponentInstaller.cs`、`DarkMode\src\DarkModeForms\*.cs`、`DownloadProgressParser.cs`、`Program.cs`、`Tests.cs` 和 `build.ps1`。在 Windows PowerShell 中執行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Build.ps1
