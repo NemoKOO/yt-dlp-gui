@@ -95,6 +95,8 @@ namespace YtDlpGuiMvp
       //private         readonly Regex                  percentPattern          = new Regex(@"\[download\]\s+(\d+(?:\.\d+)?)%", RegexOptions.Compiled); // [download] X% of Size at Speed ETA Time
         private static  readonly Regex                  urlPattern              = new Regex("https?://[^\\s<>\\[\\]\\(\\)（）“”\\\"'，。；！？、]+",
                                                                                             RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static  readonly Regex                  BilibiliUrlRegex        = new Regex(@"bilibili\.com/(?:[A-Za-z]{2}(?:-[A-Za-z]+)?/)?video/(?<bv>BV[0-9A-Za-z]+)",
+                                                                                            RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private         readonly SynchronizationContext ui;
     #if __DARK_THEME_SUPPORTED__
         private                  SystemTheme            sysTheme                = null;
@@ -120,7 +122,7 @@ namespace YtDlpGuiMvp
         private         readonly FlatProgressBar        pgbDownload             = new FlatProgressBar();
     #else
         private         readonly ProgressBar            pgbDownload             = new ProgressBar();
-    #endif  
+    #endif
         private         readonly ReplaceOnPasteTextBox  txtUrl                  = new ReplaceOnPasteTextBox();
         private         readonly TextBox                txtLog                  = new TextBox();
         private         readonly TextBox                txtSavePath             = new TextBox();
@@ -214,13 +216,13 @@ namespace YtDlpGuiMvp
             // 去除文檔只讀、隱藏等屬性，避免刪除失敗
             foreach (string file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
                 File.SetAttributes(file, FileAttributes.Normal);
-    
+
             // 去除資料夾只讀、隱藏等屬性，避免刪除失敗
             foreach (string sub in Directory.GetDirectories(path, "*", SearchOption.AllDirectories))
                 File.SetAttributes(sub, FileAttributes.Normal);
-    
+
             File.SetAttributes(path, FileAttributes.Normal);
-            
+
             Directory.Delete(path, true);
         }
 
@@ -523,10 +525,13 @@ namespace YtDlpGuiMvp
         private static string ExtractPreferredUrl(string input)
         {
             if (String.IsNullOrWhiteSpace(input)) return null;
+
             MatchCollection matches = urlPattern.Matches(input);
             if (0 == matches.Count) return null;
             Match match             = matches[matches.Count - 1];
-            return match.Value.TrimEnd('.', ',', ';', '!', '。', '，', '；', '！', '？', '、');
+            var res                 = match.Value.TrimEnd('.', ',', ';', '!', '。', '，', '；', '！', '？', '、');
+            Match m                 = BilibiliUrlRegex.Match(res);
+            return (m.Success) ? "https://www.bilibili.com/video/" + m.Groups["bv"].Value + "/" : res;
         }
 
         private static string ModeSubfolder(int mode)
@@ -1137,10 +1142,17 @@ namespace YtDlpGuiMvp
             string appDir       = AppDomain.CurrentDomain.BaseDirectory;
             string ytDlp        = Path.Combine(appDir, "yt-dlp.exe");
             string[] missing    = ComponentInstaller.MissingComponents(appDir, true);
-            if ((missing.Length > 0) &&
-                (DialogResult.Yes ==  MBOX_E("程式目録缺少以下組件：\n\n" + String.Join("\n", missing) +
-                                             "\n\n是否現在從各項目的官方 GitHub 下載並校驗？也可以取消後手動放入程式目録。",
-                                             "需要安裝運行組件", MessageBoxButtons.YesNo)))
+
+            if ((1 == missing.Length) && ("aria2c.exe" == missing[0]))
+            {
+                MBOX_I("程式目録缺少以下組件：\n\n" + String.Join("\n", missing) +
+                        "\n\n下載任務將由yt-dlp内置下載器接管。",
+                        "啓用yt-dlp内置下載器", MessageBoxButtons.OK);
+            }
+            else if ((missing.Length > 0) &&
+                      (DialogResult.Yes ==  MBOX_E("程式目録缺少以下組件：\n\n" + String.Join("\n", missing) +
+                                                   "\n\n是否現在從各項目的官方 GitHub 下載並校驗？也可以取消後手動放入程式目録。",
+                                                   "需要安裝運行組件", MessageBoxButtons.YesNo)))
             {
                 StartComponentInstall();
                 return;

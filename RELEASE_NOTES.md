@@ -3,6 +3,7 @@
 - 「暗黑模式」跟隨系統設置
 - 啓用「暗黑模式」後，FlatProgressBar、Messenger將接管ProgressBar、MessageBox.Show()，獲取更好的相容性
 - 退出程式時，刪除臨時文件夾「.component-cache-*」
+- 修復「解析Bilibili網址失敗」的問題
 
 # v0.6.2 — 支援多綫程下載
 
